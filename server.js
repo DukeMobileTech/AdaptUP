@@ -23,7 +23,7 @@ var express = require('express'),
     },
     jawboneScopes = ['basic_read', 'extended_read', 'location_read', 'mood_read', 'sleep_read', 'move_read',
         'meal_read', 'weight_read', 'generic_event_read', 'heartrate_read'],
-    EMA_ID, USER_EMAIL, ACCESS_TOKEN, DATA_DIR;
+    EMA_ID, USER_EMAIL, ACCESS_TOKEN, DATA_DIR, BASE_DIR = settings['BASE_DIR'];
 
 app.use(bodyParser.json());
 app.use(express.static(__dirname + '/public'));
@@ -73,11 +73,7 @@ passport.use('jawbone', new JawboneStrategy({
     callbackURL: jawboneAuth.callbackURL
 }, function (token, refreshToken, profile, done) {
     ACCESS_TOKEN = token;
-    DATA_DIR = 'data/' + EMA_ID + '/';
-    if (!fs.existsSync(DATA_DIR)){
-        fs.mkdirSync(DATA_DIR);
-    }
-
+    setUpDataDirectory();
     var options = {
             access_token: token,
             client_id: jawboneAuth.clientID,
@@ -262,6 +258,22 @@ function appendNewLine(filename) {
     fs.appendFile(filename, '\n', function (err) {
         if (err) throw err;
     });
+}
+
+function setUpDataDirectory() {
+    if(fs.existsSync(BASE_DIR)) {
+        DATA_DIR = BASE_DIR + EMA_ID + '/';
+        createDirectory(DATA_DIR);
+    } else {
+        DATA_DIR = 'data/' + EMA_ID + '/';
+        createDirectory(DATA_DIR);
+    }
+}
+
+function createDirectory(directory) {
+    if (!fs.existsSync(directory)) {
+        fs.mkdirSync(directory);
+    }
 }
 
 https.createServer(sslOptions, app).listen(port, function () {
