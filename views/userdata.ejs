@@ -1,0 +1,92 @@
+<!doctype html>
+<html>
+<head>
+    <title>AdaptUP</title>
+    <style type="text/css">
+        body {
+            background: url(/images/background.jpg) top center #000 no-repeat;
+            background-size: cover;
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+
+        h1 {
+            color: #fff;
+            font-size: 36px;
+        }
+
+        .sleep-table {
+            background-color: rgba(81, 0, 255, 0.8);
+            border-collapse: collapse;
+            margin: 0 auto;
+            width: 30%;
+        }
+
+        .sleep-table tr th {
+            background: rgba(46, 23, 146, 1);
+        }
+
+        .sleep-table tr th,
+        .sleep-table tr td {
+            border: 1px solid rgba(46, 23, 146, 1);
+            color: #fff;
+            font-weight: normal;
+            padding: 10px 25px;
+        }
+
+        .btn {
+            background-color: #9D65FF;
+            color: #fff;
+            display: block;
+            font-size: 24px;
+            margin: 30px auto;
+            padding: 10px;
+            text-decoration: none;
+            width: 40%;
+        }
+
+        .btn:hover {
+            background-color: #C893FF;
+        }
+    </style>
+</head>
+<body>
+<h1>Jawbone UP Sleep Data</h1>
+<table class="sleep-table">
+    <thead>
+    <tr>
+        <th>Date</th>
+        <th>Sleep time</th>
+    </tr>
+    </thead>
+    <tbody>
+
+    <% for (var i = 0; i < items.length; i++) { %>
+    <tr>
+        <td><%= items[i].date %></td>
+        <td><%= items[i].title %></td>
+    </tr>
+    <% } %>
+    </tbody>
+</table>
+
+<a href="/logout" class="btn" id="adaptup-logout">Log out</a>
+
+<!--&lt;!&ndash;<script>&ndash;&gt;-->
+<!--//    var anchor = window.document.getElementById('adaptup-logout');-->
+<!--//    anchor.addEventListener('click', showLogoutReminder, false);-->
+<!--//-->
+<!--//    function showLogoutReminder() {-->
+<!--//        //alert('Please log the user out of the Jawbone website in a different tab before proceeding to the next user');-->
+<!--//        var xhr = new XMLHttpRequest();-->
+<!--//        xhr.open("GET", "https://jawbone.com/user/signin/logout_redirect", true);-->
+<!--//        xhr.setRequestHeader("Authorization", "Bearer " + "<#% JSON.stringify(ACCESS_TOKEN) %>");-->
+<!--//        xhr.setRequestHeader("Accept", "application/xml");-->
+<!--//        xhr.send();-->
+<!--//        console.log(xhr.responseXML);-->
+<!--//        //window.location = "https://jawbone.com/user/signin/logout_redirect";-->
+<!--//        console.log("log out request sent");-->
+<!--//    }-->
+<!--&lt;!&ndash;</script>&ndash;&gt;-->
+</body>
+</html>

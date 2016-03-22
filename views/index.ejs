@@ -1,0 +1,59 @@
+<!doctype html>
+<html>
+<head>
+    <title>AdaptUp</title>
+    <style type="text/css">
+        body {
+            background: url(/images/background.jpg) top center #000 no-repeat;
+            background-size: cover;
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+
+        h1 {
+            color: #fff;
+            font-size: 36px;
+        }
+
+        .btn {
+            background-color: #001A57;
+            color: #fff;
+            display: block;
+            font-size: 24px;
+            margin: 30px auto;
+            padding: 10px;
+            text-decoration: none;
+            width: 40%;
+        }
+
+        .btn:hover {
+            background-color: #4169E1;
+        }
+
+        h4 {
+            font-style: italic;
+        }
+
+        p {
+            color: #fff;
+            display: block;
+            margin: 80px auto 40px;
+            width: 50%;
+        }
+    </style>
+</head>
+
+<body>
+<h1>AdaptUp</h1>
+<h4>Free your Jawbone data</h4>
+<form action="/home" method="get">
+    <div>
+        <label for="emaId">EMA ID:</label>
+        <input type="text" id="emaId" name="emaId" placeholder="Enter EMA ID" required /> <br />
+        <label for="email">Jawbone Email:</label>
+        <input type="text" id="email" name="email" placeholder="Jawbone Email" required />
+        <input type="submit" value="Next" class="btn" />
+    </div>
+</form>
+</body>
+</html>
