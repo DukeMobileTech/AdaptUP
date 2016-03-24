@@ -182,8 +182,9 @@ passport.use('jawbone', new JawboneStrategy({
                 });
             }, {KEYS: sleepHeader});
 
-            createSummarySheet();
-            return done(null, JSON.parse(body).data, console.log('Jawbone UP data ready to be displayed.'));
+            createSummarySheet(function () {
+                return done(null, {items: dataSummary}, console.log('Jawbone UP data ready to be displayed.'));
+            });
         }
     });
 
@@ -278,7 +279,7 @@ function createDirectory(directory) {
     }
 }
 
-function createSummarySheet() {
+function createSummarySheet(dataProcessingFinished) {
     var dataFiles = ['heartrates.csv', 'sleep.csv', 'moves.csv'], counter = 0;
     dataFiles.forEach(function (file) {
         fs.readFile(DATA_DIR + file, 'utf8', function(err, csv) {
@@ -311,6 +312,7 @@ function createSummarySheet() {
                 });
                 if (counter === dataFiles.length) {
                     writeSummarySheet();
+                    dataProcessingFinished(); //Callback ensures dataSummary is only used after it is fully processed
                 }
             });
         });

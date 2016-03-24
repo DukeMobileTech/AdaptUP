@@ -57,6 +57,8 @@
     <tr>
         <th>Date</th>
         <th>Sleep time</th>
+        <th>Steps taken</th>
+        <th>Resting HeartRate</th>
     </tr>
     </thead>
     <tbody>
@@ -64,7 +66,9 @@
     <% for (var i = 0; i < items.length; i++) { %>
     <tr>
         <td><%= items[i].date %></td>
-        <td><%= items[i].title %></td>
+        <td><%= items[i].sleep_duration %></td>
+        <td><%= items[i].step_count %></td>
+        <td><%= items[i].resting_heartrate %></td>
     </tr>
     <% } %>
     </tbody>
