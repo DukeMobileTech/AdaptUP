@@ -183,7 +183,8 @@ passport.use('jawbone', new JawboneStrategy({
             }, {KEYS: sleepHeader});
 
             createSummarySheet(function () {
-                return done(null, {items: dataSummary}, console.log('Jawbone UP data ready to be displayed.'));
+                return done(null, {items: dataSummary, user: USER_EMAIL}, console.log('Jawbone UP data ready to be' +
+                    ' displayed.'));
             });
         }
     });
@@ -311,6 +312,7 @@ function createSummarySheet(dataProcessingFinished) {
                     }
                 });
                 if (counter === dataFiles.length) {
+                    dataSummary.sort(compare);
                     writeSummarySheet();
                     dataProcessingFinished(); //Callback ensures dataSummary is only used after it is fully processed
                 }
@@ -333,6 +335,15 @@ function writeSummarySheet() {
             if (err) throw err;
         });
     });
+}
+
+function compare(objA, objB) {
+    if (objA.date < objB.date)
+        return -1;
+    else if (objA.date > objB.date)
+        return 1;
+    else
+        return 0;
 }
 
 https.createServer(sslOptions, app).listen(port, function () {
