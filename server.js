@@ -23,7 +23,8 @@ var express = require('express'),
     },
     jawboneScopes = ['basic_read', 'extended_read', 'location_read', 'mood_read', 'sleep_read', 'move_read',
         'meal_read', 'weight_read', 'generic_event_read', 'heartrate_read'],
-    EMA_ID, USER_EMAIL, ACCESS_TOKEN, DATA_DIR, BASE_DIR = settings['BASE_DIR'];
+    EMA_ID, USER_EMAIL, ACCESS_TOKEN, DATA_DIR, BASE_DIR = settings['BASE_DIR'], MAX_RESULTS = 1000000,
+    dataSummary = [];
 
 app.use(bodyParser.json());
 app.use(express.static(__dirname + '/public'));
@@ -81,7 +82,7 @@ passport.use('jawbone', new JawboneStrategy({
         },
         up = require('jawbone-up')(options);
 
-    up.heartrates.get({}, function (err, body) {
+    up.heartrates.get( {limit: MAX_RESULTS}, function (err, body) {
         if (err) {
             console.log('Error receiving Jawbone UP data');
         } else {
@@ -103,7 +104,7 @@ passport.use('jawbone', new JawboneStrategy({
         }
     });
 
-    up.workouts.get({}, function (err, body) {
+    up.workouts.get({limit: MAX_RESULTS}, function (err, body) {
         if (err) {
             console.log('Error receiving Jawbone UP data');
         } else {
@@ -127,7 +128,7 @@ passport.use('jawbone', new JawboneStrategy({
         }
     });
 
-    up.moves.get({}, function (err, body) {
+    up.moves.get({limit: MAX_RESULTS}, function (err, body) {
         if (err) {
             console.log('Error receiving Jawbone UP data');
         } else {
@@ -156,7 +157,7 @@ passport.use('jawbone', new JawboneStrategy({
         }
     });
 
-    up.sleeps.get({}, function (err, body) {
+    up.sleeps.get({limit: MAX_RESULTS}, function (err, body) {
         if (err) {
             console.log('Error receiving Jawbone UP data');
         } else {
@@ -181,6 +182,7 @@ passport.use('jawbone', new JawboneStrategy({
                 });
             }, {KEYS: sleepHeader});
 
+            createSummarySheet();
             return done(null, JSON.parse(body).data, console.log('Jawbone UP data ready to be displayed.'));
         }
     });
@@ -274,6 +276,61 @@ function createDirectory(directory) {
     if (!fs.existsSync(directory)) {
         fs.mkdirSync(directory);
     }
+}
+
+function createSummarySheet() {
+    var dataFiles = ['heartrates.csv', 'sleep.csv', 'moves.csv'], counter = 0;
+    dataFiles.forEach(function (file) {
+        fs.readFile(DATA_DIR + file, 'utf8', function(err, csv) {
+            if (err) throw err;
+            counter++;
+            converter.csv2json(csv, function(err, json) {
+                if (err) throw err;
+                json.forEach(function (entry) {
+                    var dateObj = dataSummary.filter(function(value) {
+                        return value.date == entry.date;
+                    });
+                    if (dateObj.length == 0) {
+                        var obj = {};
+                        obj.date = entry.date;
+                        obj.resting_heartrate = '';
+                        obj.step_count = '';
+                        obj.sleep_duration = '';
+                        var newObj = true;
+                    } else {
+                        obj = dateObj[0];
+                        newObj = false;
+                    }
+                    if (entry.resting_heartrate != null) { obj.resting_heartrate = entry.resting_heartrate; }
+                    if (entry.details.steps != null) { obj.step_count = entry.details.steps; }
+                    if (entry.details.duration != null) { obj.sleep_duration = formatSeconds(entry.details.duration); }
+
+                    if (newObj) {
+                        dataSummary.push(obj);
+                    }
+                });
+                if (counter === dataFiles.length) {
+                    writeSummarySheet();
+                }
+            });
+        });
+    });
+}
+
+function formatSeconds(durationInSeconds) {
+    var hours = Math.floor(parseInt(durationInSeconds) / 3600);
+    durationInSeconds %= 3600;
+    var minutes = Math.floor(parseInt(durationInSeconds) / 60);
+    return hours + "h " + minutes + "m";
+}
+
+function writeSummarySheet() {
+    converter.json2csv(dataSummary, function (err, csv) {
+        if (err) throw err;
+        fs.writeFile(DATA_DIR + 'summary.csv', csv, function (err) {
+            if (err) throw err;
+        });
+    });
 }
 
 https.createServer(sslOptions, app).listen(port, function () {
