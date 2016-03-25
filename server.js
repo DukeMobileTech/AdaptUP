@@ -9,6 +9,7 @@ var express = require('express'),
     port = 5000,
     converter = require('json-2-csv'),
     yaml = require('js-yaml'),
+    async = require("async"),
     settings = yaml.safeLoad(fs.readFileSync('config/settings.yml', 'utf8')),
     jawboneAuth = {
         clientID: settings['clientID'],
@@ -24,7 +25,7 @@ var express = require('express'),
     jawboneScopes = ['basic_read', 'extended_read', 'location_read', 'mood_read', 'sleep_read', 'move_read',
         'meal_read', 'weight_read', 'generic_event_read', 'heartrate_read'],
     EMA_ID, USER_EMAIL, ACCESS_TOKEN, DATA_DIR, BASE_DIR = settings['BASE_DIR'], MAX_RESULTS = 1000000,
-    dataSummary = [];
+    dataSummary = [], counter = 0;
 
 app.use(bodyParser.json());
 app.use(express.static(__dirname + '/public'));
@@ -99,6 +100,7 @@ passport.use('jawbone', new JawboneStrategy({
                 if (err) throw err;
                 fs.writeFile(DATA_DIR + 'heartrates.csv', csv, function (err) {
                     if (err) throw err;
+                    createSummaryObjects(heartRates);
                 });
             }, {KEYS: heartRateHeaders});
         }
@@ -149,9 +151,10 @@ passport.use('jawbone', new JawboneStrategy({
             }
 
             converter.json2csv(movesInfo, function (err, csv) {
-                if (err) console.log(err);
+                if (err) throw err;
                 fs.writeFile(DATA_DIR + 'moves.csv', csv, function (err) {
                     if (err) throw err;
+                    createSummaryObjects(movesInfo);
                 });
             }, {KEYS: movesHeaders});
         }
@@ -179,17 +182,58 @@ passport.use('jawbone', new JawboneStrategy({
                 if (err) throw err;
                 fs.writeFile(DATA_DIR + 'sleep.csv', csv, function (err) {
                     if (err) throw err;
+                    createSummaryObjects(sleepInfo, function() {
+                        async.whilst(
+                            function () { return counter < 3; },
+                            function (callback) {
+                                setTimeout(function () {
+                                    callback(null, counter);
+                                }, 1000);
+                            },
+                            function (err, n) {
+                                if (err) throw err;
+                                return done(null, { items: dataSummary, user: USER_EMAIL }, console.log('Data ready!'));
+                            }
+                        );
+                    });
                 });
             }, {KEYS: sleepHeader});
-
-            createSummarySheet(function () {
-                return done(null, {items: dataSummary, user: USER_EMAIL}, console.log('Jawbone UP data ready to be' +
-                    ' displayed.'));
-            });
         }
     });
-
 }));
+
+function createSummaryObjects(jsonArray, dataSummaryReadyCallback) {
+    jsonArray.forEach(function (entry) {
+        var dailyDataJsonArray = dataSummary.filter(function(value) {
+            return value.date == entry.date;
+        });
+
+        if (dailyDataJsonArray.length == 0) {
+            var dailyDataJsonObject = {};
+            dailyDataJsonObject.date = entry.date;
+            dailyDataJsonObject.resting_heartrate = '';
+            dailyDataJsonObject.step_count = '';
+            dailyDataJsonObject.sleep_duration = '';
+            var newDailyDataJsonObject = true;
+        } else {
+            dailyDataJsonObject = dailyDataJsonArray[0];
+            newDailyDataJsonObject = false;
+        }
+
+        if (entry.resting_heartrate != null) { dailyDataJsonObject.resting_heartrate = entry.resting_heartrate; }
+        if (entry.details.steps != null) { dailyDataJsonObject.step_count = entry.details.steps; }
+        if (entry.details.duration != null) { dailyDataJsonObject.sleep_duration = formatSeconds(entry.details.duration);}
+
+        if (newDailyDataJsonObject) { dataSummary.push(dailyDataJsonObject); }
+    });
+
+    counter++;
+    if (counter == 3) { //Data summary is from three sources (hearrates, moves, and sleeps)
+        dataSummary.sort(compare);
+        writeSummarySheet();
+    }
+    typeof dataSummaryReadyCallback === 'function' && dataSummaryReadyCallback();
+}
 
 function getMoveTicksData(up, movesXID, first) {
     var ticksHeaders = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'moves_xid', 'distance', 'time_completed', 'active_time',
@@ -278,47 +322,6 @@ function createDirectory(directory) {
     if (!fs.existsSync(directory)) {
         fs.mkdirSync(directory);
     }
-}
-
-function createSummarySheet(dataProcessingFinished) {
-    var dataFiles = ['heartrates.csv', 'sleep.csv', 'moves.csv'], counter = 0;
-    dataFiles.forEach(function (file) {
-        fs.readFile(DATA_DIR + file, 'utf8', function(err, csv) {
-            if (err) throw err;
-            counter++;
-            converter.csv2json(csv, function(err, json) {
-                if (err) throw err;
-                json.forEach(function (entry) {
-                    var dateObj = dataSummary.filter(function(value) {
-                        return value.date == entry.date;
-                    });
-                    if (dateObj.length == 0) {
-                        var obj = {};
-                        obj.date = entry.date;
-                        obj.resting_heartrate = '';
-                        obj.step_count = '';
-                        obj.sleep_duration = '';
-                        var newObj = true;
-                    } else {
-                        obj = dateObj[0];
-                        newObj = false;
-                    }
-                    if (entry.resting_heartrate != null) { obj.resting_heartrate = entry.resting_heartrate; }
-                    if (entry.details.steps != null) { obj.step_count = entry.details.steps; }
-                    if (entry.details.duration != null) { obj.sleep_duration = formatSeconds(entry.details.duration); }
-
-                    if (newObj) {
-                        dataSummary.push(obj);
-                    }
-                });
-                if (counter === dataFiles.length) {
-                    dataSummary.sort(compare);
-                    writeSummarySheet();
-                    dataProcessingFinished(); //Callback ensures dataSummary is only used after it is fully processed
-                }
-            });
-        });
-    });
 }
 
 function formatSeconds(durationInSeconds) {
