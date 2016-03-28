@@ -211,6 +211,8 @@ function createSummaryObjects(jsonArray, dataSummaryReadyCallback) {
         if (dailyDataJsonArray.length == 0) {
             var dailyDataJsonObject = {};
             dailyDataJsonObject.date = entry.date;
+            dailyDataJsonObject.user_email = USER_EMAIL;
+            dailyDataJsonObject.ema_id = EMA_ID;
             dailyDataJsonObject.resting_heartrate = '';
             dailyDataJsonObject.step_count = '';
             dailyDataJsonObject.sleep_duration = '';
