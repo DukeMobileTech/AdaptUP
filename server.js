@@ -25,7 +25,7 @@ var express = require('express'),
     jawboneScopes = ['basic_read', 'extended_read', 'location_read', 'mood_read', 'sleep_read', 'move_read',
         'meal_read', 'weight_read', 'generic_event_read', 'heartrate_read'],
     EMA_ID, USER_EMAIL, ACCESS_TOKEN, DATA_DIR, BASE_DIR = settings['BASE_DIR'], MAX_RESULTS = 1000000,
-    dataSummary = [], counter = 0;
+    dataSummary = [], counter = 0, WINDOWS_BASE_DIR = settings['WINDOWS_BASE_DIR'];
 
 app.use(bodyParser.json());
 app.use(express.static(__dirname + '/public'));
@@ -311,7 +311,10 @@ function appendNewLine(filename) {
 }
 
 function setUpDataDirectory() {
-    if(fs.existsSync(BASE_DIR)) {
+    if (settings['WINDOWS'] && fs.existsSync(WINDOWS_BASE_DIR)) {
+        DATA_DIR = WINDOWS_BASE_DIR + EMA_ID + '/';
+        createDirectory(DATA_DIR);
+    } else if(fs.existsSync(BASE_DIR)) {
         DATA_DIR = BASE_DIR + EMA_ID + '/';
         createDirectory(DATA_DIR);
     } else {
