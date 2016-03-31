@@ -144,7 +144,7 @@ passport.use('jawbone', new JawboneStrategy({
                 'details.active_time', 'details.longest_active', 'details.inactive_time', 'details.longest_idle',
                 'details.calories', 'details.bmr_day', 'details.bmr', 'details.bg_calories', 'details.wo_calories',
                 'details.wo_time', 'details.wo_active_time', 'details.wo_count', 'details.wo_longest',
-                'details.sunrise', 'details.sunset', 'details.tz'];
+                'details.sunrise', 'details.sunset', 'details.tz', 'details.steps_3am'];
 
             var movesInfo = JSON.parse(body).data.items;
             for (var k = 0; k < movesInfo.length; k++) {
@@ -171,9 +171,10 @@ passport.use('jawbone', new JawboneStrategy({
             console.log('Error receiving Jawbone UP data');
         } else {
             var sleepHeader = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'xid', 'title', 'date', 'sub_type',
-                'time_created', 'time_completed', 'place_lat', 'place_lon', 'place_acc', 'place_name',
-                'details.smart_alarm_fire', 'details.awake_time', 'details.asleep_time', 'details.awakenings',
-                'details.rem', 'details.light', 'details.deep', 'details.awake', 'details.duration', 'details.tz'];
+                'time_created', 'time_completed', 'place_lat', 'place_lon', 'place_acc', 'place_name', 'details.body',
+                'details.mind', 'details.smart_alarm_fire', 'details.awake_time', 'details.asleep_time',
+                'details.awakenings', 'details.rem', 'details.light', 'details.sound', 'details.awake',
+                'details.duration', 'details.quality', 'details.tz', 'details.sunset', 'details.sunrise'];
 
             var sleepInfo = JSON.parse(body).data.items;
             for (var k = 0; k < sleepInfo.length; k++) {
