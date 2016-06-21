@@ -25,7 +25,7 @@ var express = require('express'),
     jawboneScopes = ['basic_read', 'extended_read', 'location_read', 'mood_read', 'sleep_read', 'move_read',
         'meal_read', 'weight_read', 'generic_event_read', 'heartrate_read'],
     EMA_ID, USER_EMAIL, ACCESS_TOKEN, DATA_DIR, BASE_DIR = settings['BASE_DIR'], MAX_RESULTS = 1000000,
-    dataSummary = [], counter = 0,
+    dataSummary = [], counter = 0, START_DATE, END_DATE,
     WINDOWS_BASE_DIR = settings['WINDOWS_BASE_DIR']; /** Make sure to use UNC paths when writing to a mapped network
  drive */
 
@@ -63,6 +63,9 @@ app.get('/logout', function (req, res) {
 app.get('/home', function (req, res) {
     EMA_ID = req.query['emaId'];
     USER_EMAIL = req.query['email'];
+    var startDate = new Date(req.query['startDate']);
+    START_DATE = startDate.getTime()/1000;
+    END_DATE = new Date(startDate.setTime(startDate.getTime() + 8 * 86400000)).getTime()/1000;
     res.render('home');
 });
 
@@ -86,7 +89,7 @@ passport.use('jawbone', new JawboneStrategy({
         },
         up = require('jawbone-up')(options);
 
-    up.heartrates.get( {limit: MAX_RESULTS}, function (err, body) {
+    up.heartrates.get({start_time: START_DATE, end_time: END_DATE, limit: MAX_RESULTS}, function (err, body) {
         if (err) {
             console.log('Error receiving Jawbone UP data');
         } else {
@@ -110,7 +113,7 @@ passport.use('jawbone', new JawboneStrategy({
         }
     });
 
-    up.workouts.get({limit: MAX_RESULTS}, function (err, body) {
+    up.workouts.get({start_time: START_DATE, end_time: END_DATE, limit: MAX_RESULTS}, function (err, body) {
         if (err) {
             console.log('Error receiving Jawbone UP data');
         } else {
@@ -135,7 +138,7 @@ passport.use('jawbone', new JawboneStrategy({
         }
     });
 
-    up.moves.get({limit: MAX_RESULTS}, function (err, body) {
+    up.moves.get({start_time: START_DATE, end_time: END_DATE, limit: MAX_RESULTS}, function (err, body) {
         if (err) {
             console.log('Error receiving Jawbone UP data');
         } else {
@@ -166,7 +169,7 @@ passport.use('jawbone', new JawboneStrategy({
         }
     });
 
-    up.sleeps.get({limit: MAX_RESULTS}, function (err, body) {
+    up.sleeps.get({start_time: START_DATE, end_time: END_DATE, limit: MAX_RESULTS}, function (err, body) {
         if (err) {
             console.log('Error receiving Jawbone UP data');
         } else {
