@@ -10,6 +10,7 @@ var express = require('express'),
     converter = require('json-2-csv'),
     yaml = require('js-yaml'),
     async = require("async"),
+    webdriver = require('selenium-webdriver'),
     settings = yaml.safeLoad(fs.readFileSync('config/settings.yml', 'utf8')),
     jawboneAuth = {
         clientID: settings['clientID'],
@@ -37,6 +38,10 @@ app.set('views', __dirname + '/views');
 
 app.use(passport.initialize());
 
+// Navigate to localhost:5000 using Selenium webdriver
+var browser = new webdriver.Builder().usingServer().withCapabilities({'browserName': 'chrome' }).build();
+browser.get('https://localhost:5000/');
+
 app.get('/login/jawbone',
     passport.authorize('jawbone', {
         scope: jawboneScopes,
@@ -50,7 +55,6 @@ app.get('/sleepdata',
         failureRedirect: '/'
     }), function (req, res) {
         res.render('userdata', req.account);
-        //res.render('userdata', {ACCESS_TOKEN: ACCESS_TOKEN});
     }
 );
 
@@ -58,6 +62,8 @@ app.get('/logout', function (req, res) {
     resetVariables();
     req.logout();
     res.redirect('/');
+    browser.get('https://jawbone.com/user/signin/logout_redirect');
+    browser.get('https://localhost:5000/');
 });
 
 app.get('/home', function (req, res) {
