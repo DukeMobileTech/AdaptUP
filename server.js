@@ -26,7 +26,7 @@ var express = require('express'),
     jawboneScopes = ['basic_read', 'extended_read', 'location_read', 'mood_read', 'sleep_read', 'move_read',
         'meal_read', 'weight_read', 'generic_event_read', 'heartrate_read'],
     EMA_ID, USER_EMAIL, ACCESS_TOKEN, DATA_DIR, BASE_DIR = settings['BASE_DIR'], MAX_RESULTS = 1000000,
-    dataSummary = [], counter = 0, START_DATE, END_DATE,
+    dataSummary = [], counter = 0, START_DATE, END_DATE, userDetails = [],
     WINDOWS_BASE_DIR = settings['WINDOWS_BASE_DIR']; /** Make sure to use UNC paths when writing to a mapped network
  drive */
 
@@ -38,9 +38,59 @@ app.set('views', __dirname + '/views');
 
 app.use(passport.initialize());
 
-// Navigate to localhost:5000 using Selenium webdriver
+var lineReader = require('line-reader');
+lineReader.eachLine('config/users.csv', function(line, last) {
+    userDetails.push(line);
+    if (last) {
+        initiateDataDownload();
+        return false;
+    }
+});
+
 var browser = new webdriver.Builder().usingServer().withCapabilities({'browserName': 'chrome' }).build();
-browser.get('https://localhost:5000/');
+
+function initiateDataDownload() {
+    console.log(userDetails.length);
+    for (var i = 0; i < userDetails.length; i++) {
+        console.log("start user download");
+        downloadUserData(userDetails[i])
+    }
+}
+
+function downloadUserData(userString) {
+    var userInfo = userString.split(",");
+    // Navigate to localhost:5000 using Selenium webdriver
+    browser.get('https://localhost:5000/');
+    // First page
+    var idElement = browser.findElement(webdriver.By.id("emaId"));
+    idElement.clear();
+    idElement.sendKeys(userInfo[0]);
+    var emailElement = browser.findElement(webdriver.By.id("email"));
+    emailElement.clear();
+    emailElement.sendKeys(userInfo[1]);
+    var startDateElement = browser.findElement(webdriver.By.id("startDate"));
+    startDateElement.clear();
+    startDateElement.sendKeys(userInfo[2]);
+    var submitElement = browser.findElement(webdriver.By.id("submit"));
+    submitElement.click();
+    // Second page
+    var loginElement = browser.findElement(webdriver.By.id("login"));
+    loginElement.click();
+    // Third page
+    var jawboneEmailElement = browser.findElement(webdriver.By.id("jawbone-signin-email"));
+    jawboneEmailElement.sendKeys(userInfo[1]);
+    var jawbonePasswordElement = browser.findElement(webdriver.By.id("jawbone-signin-password"));
+    jawbonePasswordElement.sendKeys(userInfo[3]);
+    var signInElement = browser.findElement(webdriver.By.xpath("//button[@type='submit'][@class='form-button']"));
+    signInElement.click();
+    // Fourth page
+    var agreeElement = browser.findElement(webdriver.By.xpath("//button[@type='submit'][@class='form-button']"));
+    agreeElement.click();
+    // Last page
+    var logoutElement = browser.findElement(webdriver.By.id("adaptup-logout"));
+    logoutElement.click();
+    console.log("user download done");
+}
 
 app.get('/login/jawbone',
     passport.authorize('jawbone', {
