@@ -26,7 +26,7 @@ var express = require('express'),
     jawboneScopes = ['basic_read', 'extended_read', 'location_read', 'mood_read', 'sleep_read', 'move_read',
         'meal_read', 'weight_read', 'generic_event_read', 'heartrate_read'],
     EMA_ID, USER_EMAIL, ACCESS_TOKEN, DATA_DIR, BASE_DIR = settings['BASE_DIR'], MAX_RESULTS = 1000000,
-    dataSummary = [], counter = 0, START_DATE, END_DATE, userDetails = [],
+    dataSummary = [], counter = 0, START_DATE, END_DATE, userDetails = [], downloadDone = false, userCount = 0,
     WINDOWS_BASE_DIR = settings['WINDOWS_BASE_DIR']; /** Make sure to use UNC paths when writing to a mapped network
  drive */
 
@@ -38,26 +38,19 @@ app.set('views', __dirname + '/views');
 
 app.use(passport.initialize());
 
+var browser = new webdriver.Builder().usingServer().withCapabilities({'browserName': 'chrome' }).build();
+
 var lineReader = require('line-reader');
 lineReader.eachLine('config/users.csv', function(line, last) {
     userDetails.push(line);
     if (last) {
-        initiateDataDownload();
+        downloadUserData(userDetails[0]);
         return false;
     }
 });
 
-var browser = new webdriver.Builder().usingServer().withCapabilities({'browserName': 'chrome' }).build();
-
-function initiateDataDownload() {
-    console.log(userDetails.length);
-    for (var i = 0; i < userDetails.length; i++) {
-        console.log("start user download");
-        downloadUserData(userDetails[i])
-    }
-}
-
 function downloadUserData(userString) {
+    console.log("start user download for: " + userCount);
     var userInfo = userString.split(",");
     // Navigate to localhost:5000 using Selenium webdriver
     browser.get('https://localhost:5000/');
@@ -87,9 +80,26 @@ function downloadUserData(userString) {
     var agreeElement = browser.findElement(webdriver.By.xpath("//button[@type='submit'][@class='form-button']"));
     agreeElement.click();
     // Last page
-    var logoutElement = browser.findElement(webdriver.By.id("adaptup-logout"));
-    logoutElement.click();
-    console.log("user download done");
+    clickOnLogoutButton();
+}
+
+function clickOnLogoutButton() {
+    setTimeout(function() {
+        if (downloadDone) {
+            var logoutElement = browser.findElement(webdriver.By.id("adaptup-logout"));
+            logoutElement.click();
+            downloadDone = false;
+            console.log("user download done for: " + userCount);
+            userCount++;
+            if (userCount < userDetails.length) {
+                downloadUserData(userDetails[userCount]);
+            } else {
+                downloadDone = true;
+            }
+        } else {
+            clickOnLogoutButton();
+        }
+    }, 50);
 }
 
 app.get('/login/jawbone',
@@ -114,6 +124,9 @@ app.get('/logout', function (req, res) {
     res.redirect('/');
     browser.get('https://jawbone.com/user/signin/logout_redirect');
     browser.get('https://localhost:5000/');
+    if (downloadDone && userCount >= userDetails.length) {
+        browser.quit();
+    }
 });
 
 app.get('/home', function (req, res) {
@@ -258,6 +271,7 @@ passport.use('jawbone', new JawboneStrategy({
                             },
                             function (err, n) {
                                 if (err) throw err;
+                                downloadDone = true;
                                 return done(null, { items: dataSummary, user: USER_EMAIL }, console.log('Data ready!'));
                             }
                         );
@@ -301,6 +315,7 @@ function createSummaryObjects(jsonArray, dataSummaryReadyCallback) {
     if (counter == 3) { //Data summary is from three sources (hearrates, moves, and sleeps)
         dataSummary.sort(compare);
         writeSummarySheet();
+        updateCombinedSummarySheet(dataSummary);
     }
     typeof dataSummaryReadyCallback === 'function' && dataSummaryReadyCallback();
 }
@@ -411,6 +426,7 @@ function writeSummarySheet() {
             if (err) throw err;
         });
     });
+
 }
 
 function compare(objA, objB) {
@@ -422,6 +438,37 @@ function resetVariables() {
     EMA_ID = null;
     USER_EMAIL = null;
     dataSummary = null;
+}
+
+function updateCombinedSummarySheet(summaryArray) {
+    var headers = ['ema_id', 'email', 'start_date',
+        'rhr_1', 'rhr_2', 'rhr_3', 'rhr_4', 'rhr_5', 'rhr_6', 'rhr_7', 'rhr_8',
+        'sleep_1', 'sleep_2', 'sleep_3', 'sleep_4', 'sleep_5', 'sleep_6', 'sleep_7', 'sleep_8',
+        'steps_1', 'steps_2', 'steps_3', 'steps_4', 'steps_5', 'steps_6', 'steps_7', 'steps_8'];
+    var dataRow = {};
+    dataRow['ema_id'] = summaryArray[0]['ema_id'];
+    dataRow['email'] = summaryArray[0]['user_email'];
+    dataRow['start_date'] = summaryArray[0]['date'];
+    for(var j = 0; j < summaryArray.length; j++) {
+        var suffix = j + 1;
+        dataRow['rhr_' + suffix] = summaryArray[j]['resting_heartrate'];
+        dataRow['sleep_' + suffix] = summaryArray[j]['sleep_duration'];
+        dataRow['steps_' + suffix] = summaryArray[j]['step_count'];
+    }
+    var summaryUserData = [];
+    summaryUserData.push(dataRow);
+    if (userCount == 0) {
+        fs.writeFile('data/summary.csv', headers, function (err) {
+            if (err) throw err;
+        });
+        appendNewLine('data/summary.csv');
+    }
+    converter.json2csv(summaryUserData, function (err, csv) {
+        if (err) console.log(err);
+        fs.appendFile('data/summary.csv', csv, function (err) {
+            if (err) throw err;
+        });
+    }, {KEYS: headers, PREPEND_HEADER: false, CHECK_SCHEMA_DIFFERENCES: false, EMPTY_FIELD_VALUE: ''});
 }
 
 https.createServer(sslOptions, app).listen(port, function () {
