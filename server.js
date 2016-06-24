@@ -3,6 +3,7 @@ var express = require('express'),
     ejs = require('ejs'),
     https = require('https'),
     fs = require('fs'),
+    mkdirp = require('mkdirp'),
     bodyParser = require('body-parser'),
     passport = require('passport'),
     JawboneStrategy = require('passport-oauth').OAuth2Strategy,
@@ -25,10 +26,13 @@ var express = require('express'),
     },
     jawboneScopes = ['basic_read', 'extended_read', 'location_read', 'mood_read', 'sleep_read', 'move_read',
         'meal_read', 'weight_read', 'generic_event_read', 'heartrate_read'],
-    EMA_ID, USER_EMAIL, ACCESS_TOKEN, DATA_DIR, BASE_DIR = settings['BASE_DIR'], MAX_RESULTS = 1000000,
-    dataSummary = [], counter = 0, START_DATE, END_DATE, userDetails = [], downloadDone = false, userCount = 0,
-    WINDOWS_BASE_DIR = settings['WINDOWS_BASE_DIR']; /** Make sure to use UNC paths when writing to a mapped network
- drive */
+    dataSummary = [], userDetails = [],
+    downloadDone = false,
+    startDate, originalStartDate, summaryFile, timeBasedFilename,
+    EMA_ID, USER_EMAIL, ACCESS_TOKEN, DATA_DIR, BASE_DATA_DIR, START_DATE, END_DATE, SUMMARY_HEADERS,
+    WAIT_TIME = 30000, MAX_RESULTS = 1000000, counter = 0, userCount = 0,
+    LINUX_BASE_DIR = settings['LINUX_BASE_DIR'],
+    WINDOWS_BASE_DIR = settings['WINDOWS_BASE_DIR'];
 
 app.use(bodyParser.json());
 app.use(express.static(__dirname + '/public'));
@@ -41,7 +45,7 @@ app.use(passport.initialize());
 var browser = new webdriver.Builder().usingServer().withCapabilities({'browserName': 'chrome' }).build();
 
 var lineReader = require('line-reader');
-lineReader.eachLine('config/users.csv', function(line, last) {
+lineReader.eachLine('config/test.csv', function(line, last) {
     userDetails.push(line);
     if (last) {
         downloadUserData(userDetails[0]);
@@ -51,34 +55,47 @@ lineReader.eachLine('config/users.csv', function(line, last) {
 
 function downloadUserData(userString) {
     console.log("start user download for: " + userCount);
+    if (userCount == 0) {
+        setBaseDataDirectory();
+        summaryFile = BASE_DATA_DIR + timeBasedFilename + ".csv";
+        writeCombinedSummaryHeaders(); 
+    }
     var userInfo = userString.split(",");
-    // Navigate to localhost:5000 using Selenium webdriver
     browser.get('https://localhost:5000/');
+    browser.wait(function () {
+        return browser.isElementPresent(webdriver.By.name("emaId"));
+    }, WAIT_TIME);
     // First page
     var idElement = browser.findElement(webdriver.By.id("emaId"));
-    idElement.clear();
-    idElement.sendKeys(userInfo[0]);
+    if (idElement) {
+        idElement.clear();
+        idElement.sendKeys(userInfo[0]);
+    }
     var emailElement = browser.findElement(webdriver.By.id("email"));
-    emailElement.clear();
-    emailElement.sendKeys(userInfo[1]);
+    if (emailElement) {
+        emailElement.clear();
+        emailElement.sendKeys(userInfo[1]);
+    }
     var startDateElement = browser.findElement(webdriver.By.id("startDate"));
-    startDateElement.clear();
-    startDateElement.sendKeys(userInfo[2]);
+    if (startDateElement) {
+        startDateElement.clear();
+        startDateElement.sendKeys(userInfo[2]);
+    }
     var submitElement = browser.findElement(webdriver.By.id("submit"));
-    submitElement.click();
+    if (submitElement) { submitElement.click(); }
     // Second page
     var loginElement = browser.findElement(webdriver.By.id("login"));
-    loginElement.click();
+    if (loginElement) { loginElement.click(); }
     // Third page
     var jawboneEmailElement = browser.findElement(webdriver.By.id("jawbone-signin-email"));
-    jawboneEmailElement.sendKeys(userInfo[1]);
+    if (jawboneEmailElement) { jawboneEmailElement.sendKeys(userInfo[1]); }
     var jawbonePasswordElement = browser.findElement(webdriver.By.id("jawbone-signin-password"));
-    jawbonePasswordElement.sendKeys(userInfo[3]);
+    if (jawbonePasswordElement) { jawbonePasswordElement.sendKeys(userInfo[3]); }
     var signInElement = browser.findElement(webdriver.By.xpath("//button[@type='submit'][@class='form-button']"));
-    signInElement.click();
+    if (signInElement) { signInElement.click(); }
     // Fourth page
     var agreeElement = browser.findElement(webdriver.By.xpath("//button[@type='submit'][@class='form-button']"));
-    agreeElement.click();
+    if (agreeElement) { agreeElement.click(); }
     // Last page
     clickOnLogoutButton();
 }
@@ -87,7 +104,7 @@ function clickOnLogoutButton() {
     setTimeout(function() {
         if (downloadDone) {
             var logoutElement = browser.findElement(webdriver.By.id("adaptup-logout"));
-            logoutElement.click();
+            if (logoutElement) { logoutElement.click(); }
             downloadDone = false;
             console.log("user download done for: " + userCount);
             userCount++;
@@ -125,6 +142,7 @@ app.get('/logout', function (req, res) {
     browser.get('https://jawbone.com/user/signin/logout_redirect');
     browser.get('https://localhost:5000/');
     if (downloadDone && userCount >= userDetails.length) {
+        timeBasedFilename = null;
         browser.quit();
     }
 });
@@ -132,7 +150,8 @@ app.get('/logout', function (req, res) {
 app.get('/home', function (req, res) {
     EMA_ID = req.query['emaId'];
     USER_EMAIL = req.query['email'];
-    var startDate = new Date(req.query['startDate']);
+    startDate = new Date(req.query['startDate']);
+    originalStartDate = new Date(JSON.parse(JSON.stringify(startDate)));
     START_DATE = startDate.getTime()/1000;
     END_DATE = new Date(startDate.setTime(startDate.getTime() + 8 * 86400000)).getTime()/1000;
     res.render('home');
@@ -283,7 +302,7 @@ passport.use('jawbone', new JawboneStrategy({
 }));
 
 function createSummaryObjects(jsonArray, dataSummaryReadyCallback) {
-    if (dataSummary == null) dataSummary = [];
+    if (dataSummary == null) { dataSummary = []; }
     jsonArray.forEach(function (entry) {
         var dailyDataJsonArray = dataSummary.filter(function(value) {
             return value.date == entry.date;
@@ -314,8 +333,8 @@ function createSummaryObjects(jsonArray, dataSummaryReadyCallback) {
     counter++;
     if (counter == 3) { //Data summary is from three sources (hearrates, moves, and sleeps)
         dataSummary.sort(compare);
-        writeSummarySheet();
-        updateCombinedSummarySheet(dataSummary);
+        writeIndividualSummarySheet();
+        writeCombinedSummarySheet(dataSummary);
     }
     typeof dataSummaryReadyCallback === 'function' && dataSummaryReadyCallback();
 }
@@ -394,21 +413,27 @@ function appendNewLine(filename) {
 }
 
 function setUpDataDirectory() {
+    setBaseDataDirectory();
+    createDirectory(BASE_DATA_DIR + EMA_ID + '/' + timeBasedFilename  + '/');
+}
+
+function setBaseDataDirectory() {
     if (settings['WINDOWS'] && fs.existsSync(WINDOWS_BASE_DIR)) {
-        DATA_DIR = WINDOWS_BASE_DIR + EMA_ID + '/';
-        createDirectory(DATA_DIR);
-    } else if(fs.existsSync(BASE_DIR)) {
-        DATA_DIR = BASE_DIR + EMA_ID + '/';
-        createDirectory(DATA_DIR);
+        BASE_DATA_DIR = WINDOWS_BASE_DIR;
+    } else if(fs.existsSync(LINUX_BASE_DIR)) {
+        BASE_DATA_DIR = LINUX_BASE_DIR;
     } else {
-        DATA_DIR = 'data/' + EMA_ID + '/';
-        createDirectory(DATA_DIR);
+        BASE_DATA_DIR = 'data/';
     }
+    if (timeBasedFilename == null) { timeBasedFilename = new Date().toString().replace(/\W/g, "_"); }
+    DATA_DIR = BASE_DATA_DIR + EMA_ID + '/' + timeBasedFilename  + '/';
 }
 
 function createDirectory(directory) {
     if (!fs.existsSync(directory)) {
-        fs.mkdirSync(directory);
+        mkdirp(directory, function (err) {
+            if (err) throw(err);
+        });
     }
 }
 
@@ -419,14 +444,17 @@ function formatSeconds(durationInSeconds) {
     return hours + "h " + minutes + "m";
 }
 
-function writeSummarySheet() {
-    converter.json2csv(dataSummary, function (err, csv) {
+function writeIndividualSummarySheet() {
+    var summaryHeader = ['date', 'user_email', 'ema_id', 'resting_heartrate', 'step_count', 'sleep_duration'];
+    fs.writeFile(DATA_DIR + 'summary.csv', summaryHeader, function (err) {
         if (err) throw err;
-        fs.writeFile(DATA_DIR + 'summary.csv', csv, function (err) {
+        converter.json2csv(dataSummary, function (err, csv) {
             if (err) throw err;
-        });
+            fs.writeFile(DATA_DIR + 'summary.csv', csv, function (err) {
+                if (err) throw err;
+            });
+        }, { KEYS: summaryHeader, EMPTY_FIELD_VALUE: '' });
     });
-
 }
 
 function compare(objA, objB) {
@@ -437,38 +465,73 @@ function resetVariables() {
     counter = 0;
     EMA_ID = null;
     USER_EMAIL = null;
+    START_DATE = null;
+    END_DATE = null;
     dataSummary = null;
+    startDate = null;
+    originalStartDate = null;
 }
 
-function updateCombinedSummarySheet(summaryArray) {
-    var headers = ['ema_id', 'email', 'start_date',
-        'rhr_1', 'rhr_2', 'rhr_3', 'rhr_4', 'rhr_5', 'rhr_6', 'rhr_7', 'rhr_8',
-        'sleep_1', 'sleep_2', 'sleep_3', 'sleep_4', 'sleep_5', 'sleep_6', 'sleep_7', 'sleep_8',
-        'steps_1', 'steps_2', 'steps_3', 'steps_4', 'steps_5', 'steps_6', 'steps_7', 'steps_8'];
+function writeCombinedSummaryHeaders() {
+    SUMMARY_HEADERS = ['study_id', 'jawbone_email', 'study_start_date',
+        'day_0', 'day_1', 'day_2', 'day_3', 'day_4', 'day_5', 'day_6', 'day_7',
+        'resting_heartrate_day_0', 'sleep_duration_day_0', 'step_count_day_0',
+        'resting_heartrate_day_1', 'sleep_duration_day_1', 'step_count_day_1',
+        'resting_heartrate_day_2', 'sleep_duration_day_2', 'step_count_day_2',
+        'resting_heartrate_day_3', 'sleep_duration_day_3', 'step_count_day_3',
+        'resting_heartrate_day_4', 'sleep_duration_day_4', 'step_count_day_4',
+        'resting_heartrate_day_5', 'sleep_duration_day_5', 'step_count_day_5',
+        'resting_heartrate_day_6', 'sleep_duration_day_6', 'step_count_day_6',
+        'resting_heartrate_day_7', 'sleep_duration_day_7', 'step_count_day_7'];
+    fs.writeFile(summaryFile, SUMMARY_HEADERS, function (err) {
+        if (err) throw err;
+        appendNewLine(summaryFile);
+    });
+}
+
+function writeCombinedSummarySheet(summaryArray) {
+    var date;
+    if (summaryArray.length < 8) {
+        for (var i = 0; i < 8; i++) {
+            var newStartDate = new Date(JSON.parse(JSON.stringify(originalStartDate)));
+            var dataDate = new Date(newStartDate.setTime(newStartDate.getTime() + i * 86400000)).toLocaleDateString().split("/");
+            var month = dataDate[0], day = dataDate[1];
+            if (month.length == 1) { month = "0" + month; }
+            if (day.length == 1) { day = "0" + day; }
+            date = parseInt(dataDate[2] + month + day);
+            var dailyDataJsonArray = summaryArray.filter(function(value) {
+                return value.date == date;
+            });
+            if (dailyDataJsonArray.length == 0) {
+                var jsonObject = {};
+                jsonObject.date = date;
+                jsonObject.user_email = USER_EMAIL;
+                jsonObject.ema_id = EMA_ID;
+                jsonObject.resting_heartrate = '';
+                jsonObject.step_count = '';
+                jsonObject.sleep_duration = '';
+                summaryArray.push(jsonObject);
+            }
+        }
+        summaryArray.sort(compare);
+    }
     var dataRow = {};
-    dataRow['ema_id'] = summaryArray[0]['ema_id'];
-    dataRow['email'] = summaryArray[0]['user_email'];
-    dataRow['start_date'] = summaryArray[0]['date'];
-    for(var j = 0; j < summaryArray.length; j++) {
-        var suffix = j + 1;
-        dataRow['rhr_' + suffix] = summaryArray[j]['resting_heartrate'];
-        dataRow['sleep_' + suffix] = summaryArray[j]['sleep_duration'];
-        dataRow['steps_' + suffix] = summaryArray[j]['step_count'];
+    dataRow['study_id'] = EMA_ID;
+    dataRow['jawbone_email'] = USER_EMAIL;
+    dataRow['study_start_date'] = originalStartDate.toLocaleDateString();
+    for (var j = 0; j < summaryArray.length; j++) {
+        var str = summaryArray[j]['date'].toString();
+        dataRow['day_' + j] = new Date(str.substring(0,4), (parseInt(str.substring(4,6)) - 1).toString(), str.substring(6)).toLocaleDateString();
+        dataRow['resting_heartrate_day_' + j] = summaryArray[j]['resting_heartrate'];
+        dataRow['sleep_duration_day_' + j] = summaryArray[j]['sleep_duration'];
+        dataRow['step_count_day_' + j] = summaryArray[j]['step_count'];
     }
-    var summaryUserData = [];
-    summaryUserData.push(dataRow);
-    if (userCount == 0) {
-        fs.writeFile('data/summary.csv', headers, function (err) {
-            if (err) throw err;
-        });
-        appendNewLine('data/summary.csv');
-    }
-    converter.json2csv(summaryUserData, function (err, csv) {
+    converter.json2csv([dataRow], function (err, csv) {
         if (err) console.log(err);
-        fs.appendFile('data/summary.csv', csv, function (err) {
+        fs.appendFile(summaryFile, csv, function (err) {
             if (err) throw err;
         });
-    }, {KEYS: headers, PREPEND_HEADER: false, CHECK_SCHEMA_DIFFERENCES: false, EMPTY_FIELD_VALUE: ''});
+    }, {KEYS: SUMMARY_HEADERS, PREPEND_HEADER: false, CHECK_SCHEMA_DIFFERENCES: false, EMPTY_FIELD_VALUE: ''});
 }
 
 https.createServer(sslOptions, app).listen(port, function () {
