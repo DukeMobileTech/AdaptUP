@@ -10,7 +10,7 @@ var express = require('express'),
     port = 5000,
     converter = require('json-2-csv'),
     yaml = require('js-yaml'),
-    async = require("async"),
+    async = require('async'),
     webdriver = require('selenium-webdriver'),
     settings = yaml.safeLoad(fs.readFileSync('config/settings.yml', 'utf8')),
     jawboneAuth = {
@@ -28,8 +28,8 @@ var express = require('express'),
         'meal_read', 'weight_read', 'generic_event_read', 'heartrate_read'],
     dataSummary = [], userDetails = [],
     downloadDone = false,
-    startDate, originalStartDate, summaryFile, timeBasedFilename,
-    EMA_ID, USER_EMAIL, ACCESS_TOKEN, DATA_DIR, BASE_DATA_DIR, START_DATE, END_DATE, SUMMARY_HEADERS,
+    startDate, originalStartDate, wideSummaryFile, longSummaryFile, timeBasedFilename,
+    EMA_ID, USER_EMAIL, ACCESS_TOKEN, DATA_DIR, BASE_DATA_DIR, START_DATE, END_DATE, WIDE_SUMMARY_HEADERS, LONG_SUMMARY_HEADERS,
     WAIT_TIME = 30000, MAX_RESULTS = 1000000, counter = 0, userCount = 0,
     LINUX_BASE_DIR = settings['LINUX_BASE_DIR'],
     WINDOWS_BASE_DIR = settings['WINDOWS_BASE_DIR'];
@@ -54,42 +54,43 @@ lineReader.eachLine('config/test.csv', function(line, last) {
 });
 
 function downloadUserData(userString) {
-    console.log("start user download for: " + userCount);
+    console.log('start user download for: ' + userCount);
     if (userCount == 0) {
         setBaseDataDirectory();
-        summaryFile = BASE_DATA_DIR + timeBasedFilename + ".csv";
+        wideSummaryFile = BASE_DATA_DIR + timeBasedFilename + 'wide.csv';
+        longSummaryFile = BASE_DATA_DIR + timeBasedFilename + 'long.csv';
         writeCombinedSummaryHeaders(); 
     }
-    var userInfo = userString.split(",");
+    var userInfo = userString.split(',');
     browser.get('https://localhost:5000/');
     browser.wait(function () {
-        return browser.isElementPresent(webdriver.By.name("emaId"));
+        return browser.isElementPresent(webdriver.By.name('emaId'));
     }, WAIT_TIME);
     // First page
-    var idElement = browser.findElement(webdriver.By.id("emaId"));
+    var idElement = browser.findElement(webdriver.By.id('emaId'));
     if (idElement) {
         idElement.clear();
         idElement.sendKeys(userInfo[0]);
     }
-    var emailElement = browser.findElement(webdriver.By.id("email"));
+    var emailElement = browser.findElement(webdriver.By.id('email'));
     if (emailElement) {
         emailElement.clear();
         emailElement.sendKeys(userInfo[1]);
     }
-    var startDateElement = browser.findElement(webdriver.By.id("startDate"));
+    var startDateElement = browser.findElement(webdriver.By.id('startDate'));
     if (startDateElement) {
         startDateElement.clear();
         startDateElement.sendKeys(userInfo[2]);
     }
-    var submitElement = browser.findElement(webdriver.By.id("submit"));
+    var submitElement = browser.findElement(webdriver.By.id('submit'));
     if (submitElement) { submitElement.click(); }
     // Second page
-    var loginElement = browser.findElement(webdriver.By.id("login"));
+    var loginElement = browser.findElement(webdriver.By.id('login'));
     if (loginElement) { loginElement.click(); }
     // Third page
-    var jawboneEmailElement = browser.findElement(webdriver.By.id("jawbone-signin-email"));
+    var jawboneEmailElement = browser.findElement(webdriver.By.id('jawbone-signin-email'));
     if (jawboneEmailElement) { jawboneEmailElement.sendKeys(userInfo[1]); }
-    var jawbonePasswordElement = browser.findElement(webdriver.By.id("jawbone-signin-password"));
+    var jawbonePasswordElement = browser.findElement(webdriver.By.id('jawbone-signin-password'));
     if (jawbonePasswordElement) { jawbonePasswordElement.sendKeys(userInfo[3]); }
     var signInElement = browser.findElement(webdriver.By.xpath("//button[@type='submit'][@class='form-button']"));
     if (signInElement) { signInElement.click(); }
@@ -103,10 +104,10 @@ function downloadUserData(userString) {
 function clickOnLogoutButton() {
     setTimeout(function() {
         if (downloadDone) {
-            var logoutElement = browser.findElement(webdriver.By.id("adaptup-logout"));
+            var logoutElement = browser.findElement(webdriver.By.id('adaptup-logout'));
             if (logoutElement) { logoutElement.click(); }
             downloadDone = false;
-            console.log("user download done for: " + userCount);
+            console.log('user download done for: ' + userCount);
             userCount++;
             if (userCount < userDetails.length) {
                 downloadUserData(userDetails[userCount]);
@@ -334,7 +335,7 @@ function createSummaryObjects(jsonArray, dataSummaryReadyCallback) {
     if (counter == 3) { //Data summary is from three sources (hearrates, moves, and sleeps)
         dataSummary.sort(compare);
         writeIndividualSummarySheet();
-        writeCombinedSummarySheet(dataSummary);
+        generateCombinedSummarySheets(dataSummary);
     }
     typeof dataSummaryReadyCallback === 'function' && dataSummaryReadyCallback();
 }
@@ -441,7 +442,7 @@ function formatSeconds(durationInSeconds) {
     var hours = Math.floor(parseInt(durationInSeconds) / 3600);
     durationInSeconds %= 3600;
     var minutes = Math.floor(parseInt(durationInSeconds) / 60);
-    return hours + "h " + minutes + "m";
+    return hours + 'h ' + minutes + 'm';
 }
 
 function writeIndividualSummarySheet() {
@@ -473,7 +474,7 @@ function resetVariables() {
 }
 
 function writeCombinedSummaryHeaders() {
-    SUMMARY_HEADERS = ['study_id', 'jawbone_email', 'study_start_date',
+    WIDE_SUMMARY_HEADERS = ['study_id', 'jawbone_email', 'study_start_date',
         'day_0', 'day_1', 'day_2', 'day_3', 'day_4', 'day_5', 'day_6', 'day_7',
         'resting_heartrate_day_0', 'sleep_duration_day_0', 'step_count_day_0',
         'resting_heartrate_day_1', 'sleep_duration_day_1', 'step_count_day_1',
@@ -483,21 +484,27 @@ function writeCombinedSummaryHeaders() {
         'resting_heartrate_day_5', 'sleep_duration_day_5', 'step_count_day_5',
         'resting_heartrate_day_6', 'sleep_duration_day_6', 'step_count_day_6',
         'resting_heartrate_day_7', 'sleep_duration_day_7', 'step_count_day_7'];
-    fs.writeFile(summaryFile, SUMMARY_HEADERS, function (err) {
+    fs.writeFile(wideSummaryFile, WIDE_SUMMARY_HEADERS, function (err) {
         if (err) throw err;
-        appendNewLine(summaryFile);
+        appendNewLine(wideSummaryFile);
+    });
+    LONG_SUMMARY_HEADERS = ['study_id', 'jawbone_email', 'study_start_date',
+    'day', 'resting_heartrate', 'sleep_duration', 'step_count'];
+    fs.writeFile(longSummaryFile, LONG_SUMMARY_HEADERS, function (err) {
+        if (err) throw err;
+        appendNewLine(longSummaryFile);
     });
 }
 
-function writeCombinedSummarySheet(summaryArray) {
+function generateCombinedSummarySheets(summaryArray) {
     var date;
     if (summaryArray.length < 8) {
         for (var i = 0; i < 8; i++) {
             var newStartDate = new Date(JSON.parse(JSON.stringify(originalStartDate)));
             var dataDate = new Date(newStartDate.setTime(newStartDate.getTime() + i * 86400000)).toLocaleDateString().split("/");
             var month = dataDate[0], day = dataDate[1];
-            if (month.length == 1) { month = "0" + month; }
-            if (day.length == 1) { day = "0" + day; }
+            if (month.length == 1) { month = '0' + month; }
+            if (day.length == 1) { day = '0' + day; }
             date = parseInt(dataDate[2] + month + day);
             var dailyDataJsonArray = summaryArray.filter(function(value) {
                 return value.date == date;
@@ -515,23 +522,53 @@ function writeCombinedSummarySheet(summaryArray) {
         }
         summaryArray.sort(compare);
     }
+    writeWideFormat(summaryArray);
+    writeLongFormat(summaryArray);
+}
+
+function formatDateString(str) {
+    return new Date(str.substring(0, 4), (parseInt(str.substring(4, 6)) - 1).toString(), str.substring(6)).toLocaleDateString();
+}
+
+function generateDefaultRowData() {
     var dataRow = {};
     dataRow['study_id'] = EMA_ID;
     dataRow['jawbone_email'] = USER_EMAIL;
     dataRow['study_start_date'] = originalStartDate.toLocaleDateString();
-    for (var j = 0; j < summaryArray.length; j++) {
-        var str = summaryArray[j]['date'].toString();
-        dataRow['day_' + j] = new Date(str.substring(0,4), (parseInt(str.substring(4,6)) - 1).toString(), str.substring(6)).toLocaleDateString();
-        dataRow['resting_heartrate_day_' + j] = summaryArray[j]['resting_heartrate'];
-        dataRow['sleep_duration_day_' + j] = summaryArray[j]['sleep_duration'];
-        dataRow['step_count_day_' + j] = summaryArray[j]['step_count'];
-    }
-    converter.json2csv([dataRow], function (err, csv) {
+    return dataRow;
+}
+
+function writeJsonToCsvFile(dataArray, filename, headers) {
+    converter.json2csv(dataArray, function (err, csv) {
         if (err) console.log(err);
-        fs.appendFile(summaryFile, csv, function (err) {
+        fs.appendFile(filename, csv, function (err) {
             if (err) throw err;
         });
-    }, {KEYS: SUMMARY_HEADERS, PREPEND_HEADER: false, CHECK_SCHEMA_DIFFERENCES: false, EMPTY_FIELD_VALUE: ''});
+    }, {KEYS: headers, PREPEND_HEADER: false, CHECK_SCHEMA_DIFFERENCES: false, EMPTY_FIELD_VALUE: ''});
+}
+
+function writeWideFormat(data) {
+    var dataRow = generateDefaultRowData();
+    for (var j = 0; j < data.length; j++) {
+        dataRow['day_' + j] = formatDateString(data[j]['date'].toString());
+        dataRow['resting_heartrate_day_' + j] = data[j]['resting_heartrate'];
+        dataRow['sleep_duration_day_' + j] = data[j]['sleep_duration'];
+        dataRow['step_count_day_' + j] = data[j]['step_count'];
+    }
+    writeJsonToCsvFile([dataRow], wideSummaryFile, WIDE_SUMMARY_HEADERS);
+}
+
+function writeLongFormat(data) {
+    var userData = [];
+    for (var j = 0; j < data.length; j++) {
+        var dataRow = generateDefaultRowData();
+        dataRow['day'] = formatDateString(data[j]['date'].toString());
+        dataRow['resting_heartrate'] = data[j]['resting_heartrate'];
+        dataRow['sleep_duration'] = data[j]['sleep_duration'];
+        dataRow['step_count'] = data[j]['step_count'];
+        userData.push(dataRow);
+    }
+    writeJsonToCsvFile(userData, longSummaryFile, LONG_SUMMARY_HEADERS);
 }
 
 https.createServer(sslOptions, app).listen(port, function () {
