@@ -28,9 +28,10 @@ var express = require('express'),
         'meal_read', 'weight_read', 'generic_event_read', 'heartrate_read'],
     dataSummary = [], userDetails = [],
     downloadDone = false,
+    user, numSleepTicks, numMoveTicks,
     startDate, originalStartDate, wideSummaryFile, longSummaryFile, timeBasedFilename,
-    EMA_ID, USER_EMAIL, ACCESS_TOKEN, DATA_DIR, BASE_DATA_DIR, START_DATE, END_DATE, WIDE_SUMMARY_HEADERS, LONG_SUMMARY_HEADERS,
-    WAIT_TIME = 30000, MAX_RESULTS = 1000000, counter = 0, userCount = 0,
+    DATA_DIR, BASE_DATA_DIR, START_DATE, END_DATE, WIDE_SUMMARY_HEADERS, LONG_SUMMARY_HEADERS,
+    WAIT_TIME = 30000, MAX_RESULTS = 1000000, counter = 0, userCount = 0, moveCount = 0, sleepCount = 0,
     LINUX_BASE_DIR = settings['LINUX_BASE_DIR'],
     WINDOWS_BASE_DIR = settings['WINDOWS_BASE_DIR'];
 
@@ -53,14 +54,10 @@ lineReader.eachLine('config/test.csv', function(line, last) {
     }
 });
 
+var User = require('./user.js');
+
 function downloadUserData(userString) {
     console.log('start user download for: ' + userCount);
-    if (userCount == 0) {
-        setBaseDataDirectory();
-        wideSummaryFile = BASE_DATA_DIR + timeBasedFilename + 'wide.csv';
-        longSummaryFile = BASE_DATA_DIR + timeBasedFilename + 'long.csv';
-        writeCombinedSummaryHeaders(); 
-    }
     var userInfo = userString.split(',');
     browser.get('https://localhost:5000/');
     browser.wait(function () {
@@ -103,7 +100,7 @@ function downloadUserData(userString) {
 
 function clickOnLogoutButton() {
     setTimeout(function() {
-        if (downloadDone) {
+        if (downloadDone && moveCount == numMoveTicks && sleepCount == numSleepTicks) {
             var logoutElement = browser.findElement(webdriver.By.id('adaptup-logout'));
             if (logoutElement) { logoutElement.click(); }
             downloadDone = false;
@@ -149,13 +146,18 @@ app.get('/logout', function (req, res) {
 });
 
 app.get('/home', function (req, res) {
-    EMA_ID = req.query['emaId'];
-    USER_EMAIL = req.query['email'];
+    user = new User(req.query['emaId'], req.query['email']);
     startDate = new Date(req.query['startDate']);
     originalStartDate = new Date(JSON.parse(JSON.stringify(startDate)));
     START_DATE = startDate.getTime()/1000;
     END_DATE = new Date(startDate.setTime(startDate.getTime() + 8 * 86400000)).getTime()/1000;
     res.render('home');
+    if (userCount == 0) {
+        setBaseDataDirectory();
+        wideSummaryFile = BASE_DATA_DIR + timeBasedFilename + 'wide.csv';
+        longSummaryFile = BASE_DATA_DIR + timeBasedFilename + 'long.csv';
+        writeCombinedSummaryHeaders();
+    }
 });
 
 app.get('/', function (req, res) {
@@ -169,7 +171,6 @@ passport.use('jawbone', new JawboneStrategy({
     tokenURL: jawboneAuth.tokenURL,
     callbackURL: jawboneAuth.callbackURL
 }, function (token, refreshToken, profile, done) {
-    ACCESS_TOKEN = token;
     setUpDataDirectory();
     var options = {
             access_token: token,
@@ -177,6 +178,22 @@ passport.use('jawbone', new JawboneStrategy({
             client_secret: jawboneAuth.clientSecret
         },
         up = require('jawbone-up')(options);
+
+    up.me.get({}, function (err, body) {
+        if (err) throw err;
+        var userData = JSON.parse(body).data;
+        user.setHeight(userData.height);
+        user.setWeight(userData.weight);
+        user.setGender(userData.gender ? 1 : 0); // false == 0 == male and true == 1 == female
+    });
+
+    // up.trends.get({ bucket_size: "w", num_buckets: 1, end_date: formatDate(new Date(END_DATE)) }, function (err, body) {
+    //    console.log(JSON.parse(body));
+    //     var trends = JSON.parse(body).data;
+    //     for (var k = 0; k < trends.data.length; k++) {
+    //         console.log(trends.data[k]);
+    //     }
+    // });
 
     up.heartrates.get({start_time: START_DATE, end_time: END_DATE, limit: MAX_RESULTS}, function (err, body) {
         if (err) {
@@ -189,8 +206,8 @@ passport.use('jawbone', new JawboneStrategy({
             for (var k = 0; k < heartRates.length; k++) {
                 heartRates[k]['user_xid'] = JSON.parse(body).meta['user_xid'];
                 heartRates[k]['time_accessed'] = JSON.parse(body).meta['time'];
-                heartRates[k]['user_email'] = USER_EMAIL;
-                heartRates[k]['ema_id'] = EMA_ID;
+                heartRates[k]['user_email'] = user.email;
+                heartRates[k]['ema_id'] = user.studyId;
             }
             converter.json2csv(heartRates, function (err, csv) {
                 if (err) throw err;
@@ -215,8 +232,8 @@ passport.use('jawbone', new JawboneStrategy({
             for (var k = 0; k < jawboneData.length; k++) {
                 jawboneData[k]['user_xid'] = JSON.parse(body).meta['user_xid'];
                 jawboneData[k]['time_accessed'] = JSON.parse(body).meta['time'];
-                jawboneData[k]['user_email'] = USER_EMAIL;
-                jawboneData[k]['ema_id'] = EMA_ID;
+                jawboneData[k]['user_email'] = user.email;
+                jawboneData[k]['ema_id'] = user.studyId;
             }
             converter.json2csv(jawboneData, function (err, csv) {
                 if (err) throw err;
@@ -239,10 +256,11 @@ passport.use('jawbone', new JawboneStrategy({
                 'details.sunrise', 'details.sunset', 'details.tz', 'details.steps_3am'];
 
             var movesInfo = JSON.parse(body).data.items;
+            numMoveTicks = movesInfo.length;
             for (var k = 0; k < movesInfo.length; k++) {
                 movesInfo[k]['user_xid'] = JSON.parse(body).meta['user_xid'];
-                movesInfo[k]['user_email'] = USER_EMAIL;
-                movesInfo[k]['ema_id'] = EMA_ID;
+                movesInfo[k]['user_email'] = user.email;
+                movesInfo[k]['ema_id'] = user.studyId;
                 movesInfo[k]['time_accessed'] = JSON.parse(body).meta['time'];
                 movesInfo[k]['title'] = movesInfo[k]['title'].replace(',', '');
                 getMoveTicksData(up, movesInfo[k]['xid'], k == 0);
@@ -269,11 +287,12 @@ passport.use('jawbone', new JawboneStrategy({
                 'details.duration', 'details.quality', 'details.tz', 'details.sunset', 'details.sunrise'];
 
             var sleepInfo = JSON.parse(body).data.items;
+            numSleepTicks = sleepInfo.length;
             for (var k = 0; k < sleepInfo.length; k++) {
                 sleepInfo[k]['user_xid'] = JSON.parse(body).meta['user_xid'];
                 sleepInfo[k]['time_accessed'] = JSON.parse(body).meta['time'];
-                sleepInfo[k]['user_email'] = USER_EMAIL;
-                sleepInfo[k]['ema_id'] = EMA_ID;
+                sleepInfo[k]['user_email'] = user.email;
+                sleepInfo[k]['ema_id'] = user.studyId;
                 getSleepTicksData(up, sleepInfo[k]['xid'], k == 0);
             }
 
@@ -292,7 +311,7 @@ passport.use('jawbone', new JawboneStrategy({
                             function (err, n) {
                                 if (err) throw err;
                                 downloadDone = true;
-                                return done(null, { items: dataSummary, user: USER_EMAIL }, console.log('Data ready!'));
+                                return done(null, { items: dataSummary, user: user.email }, console.log('Data ready!'));
                             }
                         );
                     });
@@ -301,6 +320,14 @@ passport.use('jawbone', new JawboneStrategy({
         }
     });
 }));
+
+function formatDate(endDate) {
+    var month = endDate.getMonth().toString();
+    var date = endDate.getDate().toString();
+    if (month.length == 1) { month = '0' + month; }
+    if (date.length == 1) { date = '0' + date; }
+   return parseInt(endDate.getFullYear().toString() + month + date);
+}
 
 function createSummaryObjects(jsonArray, dataSummaryReadyCallback) {
     if (dataSummary == null) { dataSummary = []; }
@@ -312,8 +339,8 @@ function createSummaryObjects(jsonArray, dataSummaryReadyCallback) {
         if (dailyDataJsonArray.length == 0) {
             var dailyDataJsonObject = {};
             dailyDataJsonObject.date = entry.date;
-            dailyDataJsonObject.user_email = USER_EMAIL;
-            dailyDataJsonObject.ema_id = EMA_ID;
+            dailyDataJsonObject.user_email = user.email;
+            dailyDataJsonObject.ema_id = user.studyId;
             dailyDataJsonObject.resting_heartrate = '';
             dailyDataJsonObject.step_count = '';
             dailyDataJsonObject.sleep_duration = '';
@@ -361,13 +388,14 @@ function getMoveTicksData(up, movesXID, first) {
                 ticksInfo[j]['user_xid'] = userXID;
                 ticksInfo[j]['time_accessed'] = ticksAccessTime;
                 ticksInfo[j]['moves_xid'] = movesXID;
-                ticksInfo[j]['user_email'] = USER_EMAIL;
-                ticksInfo[j]['ema_id'] = EMA_ID;
+                ticksInfo[j]['user_email'] = user.email;
+                ticksInfo[j]['ema_id'] = user.studyId;
             }
             converter.json2csv(ticksInfo, function (err, csv) {
                 if (err) console.log(err);
                 fs.appendFile(DATA_DIR + 'move_ticks.csv', csv, function (err) {
                     if (err) throw err;
+                    moveCount++;
                 });
             }, {KEYS: ticksHeaders, PREPEND_HEADER: false, CHECK_SCHEMA_DIFFERENCES: false, EMPTY_FIELD_VALUE: ''});
         }
@@ -394,13 +422,14 @@ function getSleepTicksData(up, sleepsXID, first) {
                 ticksInfo[j]['user_xid'] = userXID;
                 ticksInfo[j]['time_accessed'] = ticksAccessTime;
                 ticksInfo[j]['sleeps_xid'] = sleepsXID;
-                ticksInfo[j]['user_email'] = USER_EMAIL;
-                ticksInfo[j]['ema_id'] = EMA_ID;
+                ticksInfo[j]['user_email'] = user.email;
+                ticksInfo[j]['ema_id'] = user.studyId;
             }
             converter.json2csv(ticksInfo, function (err, csv) {
                 if (err) console.log(err);
                 fs.appendFile(DATA_DIR + 'sleep_ticks.csv', csv, function (err) {
                     if (err) throw err;
+                    sleepCount++;
                 });
             }, {KEYS: sleepTicksHeader, PREPEND_HEADER: false, CHECK_SCHEMA_DIFFERENCES: false, EMPTY_FIELD_VALUE: ''});
         }
@@ -415,7 +444,7 @@ function appendNewLine(filename) {
 
 function setUpDataDirectory() {
     setBaseDataDirectory();
-    createDirectory(BASE_DATA_DIR + EMA_ID + '/' + timeBasedFilename  + '/');
+    createDirectory(BASE_DATA_DIR + user.studyId + '/' + timeBasedFilename  + '/');
 }
 
 function setBaseDataDirectory() {
@@ -427,7 +456,7 @@ function setBaseDataDirectory() {
         BASE_DATA_DIR = 'data/';
     }
     if (timeBasedFilename == null) { timeBasedFilename = new Date().toString().replace(/\W/g, "_"); }
-    DATA_DIR = BASE_DATA_DIR + EMA_ID + '/' + timeBasedFilename  + '/';
+    DATA_DIR = BASE_DATA_DIR + user.studyId + '/' + timeBasedFilename  + '/';
 }
 
 function createDirectory(directory) {
@@ -464,17 +493,20 @@ function compare(objA, objB) {
 
 function resetVariables() {
     counter = 0;
-    EMA_ID = null;
-    USER_EMAIL = null;
+    user = null;
     START_DATE = null;
     END_DATE = null;
     dataSummary = null;
     startDate = null;
     originalStartDate = null;
+    moveCount = 0;
+    sleepCount = 0;
+    numMoveTicks = null;
+    numSleepTicks = null;
 }
 
 function writeCombinedSummaryHeaders() {
-    WIDE_SUMMARY_HEADERS = ['study_id', 'jawbone_email', 'study_start_date',
+    WIDE_SUMMARY_HEADERS = ['study_id', 'jawbone_email', 'gender', 'gender_label', 'height', 'weight', 'study_start_date',
         'day_0', 'day_1', 'day_2', 'day_3', 'day_4', 'day_5', 'day_6', 'day_7',
         'resting_heartrate_day_0', 'sleep_duration_day_0', 'step_count_day_0',
         'resting_heartrate_day_1', 'sleep_duration_day_1', 'step_count_day_1',
@@ -488,7 +520,7 @@ function writeCombinedSummaryHeaders() {
         if (err) throw err;
         appendNewLine(wideSummaryFile);
     });
-    LONG_SUMMARY_HEADERS = ['study_id', 'jawbone_email', 'study_start_date',
+    LONG_SUMMARY_HEADERS = ['study_id', 'jawbone_email', 'gender', 'gender_label', 'height', 'weight', 'study_start_date',
     'day', 'resting_heartrate', 'sleep_duration', 'step_count'];
     fs.writeFile(longSummaryFile, LONG_SUMMARY_HEADERS, function (err) {
         if (err) throw err;
@@ -512,8 +544,8 @@ function generateCombinedSummarySheets(summaryArray) {
             if (dailyDataJsonArray.length == 0) {
                 var jsonObject = {};
                 jsonObject.date = date;
-                jsonObject.user_email = USER_EMAIL;
-                jsonObject.ema_id = EMA_ID;
+                jsonObject.user_email = user.email;
+                jsonObject.ema_id = user.studyId;
                 jsonObject.resting_heartrate = '';
                 jsonObject.step_count = '';
                 jsonObject.sleep_duration = '';
@@ -532,8 +564,12 @@ function formatDateString(str) {
 
 function generateDefaultRowData() {
     var dataRow = {};
-    dataRow['study_id'] = EMA_ID;
-    dataRow['jawbone_email'] = USER_EMAIL;
+    dataRow['study_id'] = user.studyId;
+    dataRow['jawbone_email'] = user.email;
+    dataRow['gender'] = user.gender;
+    dataRow['height'] = user.height;
+    dataRow['gender_label'] = user.gender ? 'female' : 'male';
+    dataRow['weight'] = user.weight;
     dataRow['study_start_date'] = originalStartDate.toLocaleDateString();
     return dataRow;
 }
