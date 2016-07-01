@@ -29,8 +29,8 @@ var express = require('express'),
     dataSummary = [], userDetails = [],
     downloadDone = false,
     user, numSleepTicks, numMoveTicks,
-    startDate, originalStartDate, wideSummaryFile, longSummaryFile, timeBasedFilename,
-    DATA_DIR, BASE_DATA_DIR, START_DATE, END_DATE, WIDE_SUMMARY_HEADERS, LONG_SUMMARY_HEADERS,
+    startDate, originalStartDate, wideSummaryFile, longSummaryFile, shortSummaryFile, timeBasedFilename,
+    DATA_DIR, BASE_DATA_DIR, START_DATE, END_DATE, WIDE_SUMMARY_HEADERS, LONG_SUMMARY_HEADERS, SHORT_SUMMARY_HEADERS,
     WAIT_TIME = 30000, MAX_RESULTS = 1000000, counter = 0, userCount = 0, moveCount = 0, sleepCount = 0,
     LINUX_BASE_DIR = settings['LINUX_BASE_DIR'],
     WINDOWS_BASE_DIR = settings['WINDOWS_BASE_DIR'];
@@ -152,12 +152,7 @@ app.get('/home', function (req, res) {
     START_DATE = startDate.getTime()/1000;
     END_DATE = new Date(startDate.setTime(startDate.getTime() + 8 * 86400000)).getTime()/1000;
     res.render('home');
-    if (userCount == 0) {
-        setBaseDataDirectory();
-        wideSummaryFile = BASE_DATA_DIR + timeBasedFilename + 'wide.csv';
-        longSummaryFile = BASE_DATA_DIR + timeBasedFilename + 'long.csv';
-        writeCombinedSummaryHeaders();
-    }
+    generateCombinedSummaryFiles();
 });
 
 app.get('/', function (req, res) {
@@ -362,7 +357,7 @@ function createSummaryObjects(jsonArray, dataSummaryReadyCallback) {
     if (counter == 3) { //Data summary is from three sources (hearrates, moves, and sleeps)
         dataSummary.sort(compare);
         writeIndividualSummarySheet();
-        generateCombinedSummarySheets(dataSummary);
+        sanitizeCombinedSummaryData(dataSummary);
     }
     typeof dataSummaryReadyCallback === 'function' && dataSummaryReadyCallback();
 }
@@ -505,7 +500,19 @@ function resetVariables() {
     numSleepTicks = null;
 }
 
-function writeCombinedSummaryHeaders() {
+function generateCombinedSummaryFiles() {
+    if (userCount == 0) {
+        setBaseDataDirectory();
+        createDirectory(BASE_DATA_DIR + 'summaries/');
+        var base = BASE_DATA_DIR + 'summaries/' + timeBasedFilename;
+        wideSummaryFile = base + 'wide.csv';
+        longSummaryFile = base + 'long.csv';
+        shortSummaryFile = base + 'short.csv';
+        generateCombinedSummaryHeaders();
+    }
+}
+
+function generateCombinedSummaryHeaders() {
     WIDE_SUMMARY_HEADERS = ['study_id', 'jawbone_email', 'gender', 'gender_label', 'height', 'weight', 'study_start_date',
         'day_0', 'day_1', 'day_2', 'day_3', 'day_4', 'day_5', 'day_6', 'day_7',
         'resting_heartrate_day_0', 'sleep_duration_day_0', 'step_count_day_0',
@@ -516,19 +523,22 @@ function writeCombinedSummaryHeaders() {
         'resting_heartrate_day_5', 'sleep_duration_day_5', 'step_count_day_5',
         'resting_heartrate_day_6', 'sleep_duration_day_6', 'step_count_day_6',
         'resting_heartrate_day_7', 'sleep_duration_day_7', 'step_count_day_7'];
-    fs.writeFile(wideSummaryFile, WIDE_SUMMARY_HEADERS, function (err) {
-        if (err) throw err;
-        appendNewLine(wideSummaryFile);
-    });
+    writeHeaders(wideSummaryFile, WIDE_SUMMARY_HEADERS);
     LONG_SUMMARY_HEADERS = ['study_id', 'jawbone_email', 'gender', 'gender_label', 'height', 'weight', 'study_start_date',
     'day', 'resting_heartrate', 'sleep_duration', 'step_count'];
-    fs.writeFile(longSummaryFile, LONG_SUMMARY_HEADERS, function (err) {
+    writeHeaders(longSummaryFile, LONG_SUMMARY_HEADERS);
+    SHORT_SUMMARY_HEADERS = ['STUDY_ID', 'JAWBONE_EMAIL', 'NUM_SLEEP_DAYS', 'NUM_STEP_DAYS'];
+    writeHeaders(shortSummaryFile, SHORT_SUMMARY_HEADERS);
+}
+
+function writeHeaders(filename, headers) {
+    fs.writeFile(filename, headers, function (err) {
         if (err) throw err;
-        appendNewLine(longSummaryFile);
+        appendNewLine(filename);
     });
 }
 
-function generateCombinedSummarySheets(summaryArray) {
+function sanitizeCombinedSummaryData(summaryArray) {
     var date;
     if (summaryArray.length < 8) {
         for (var i = 0; i < 8; i++) {
@@ -556,6 +566,7 @@ function generateCombinedSummarySheets(summaryArray) {
     }
     writeWideFormat(summaryArray);
     writeLongFormat(summaryArray);
+    writeShortFormat(summaryArray);
 }
 
 function formatDateString(str) {
@@ -605,6 +616,17 @@ function writeLongFormat(data) {
         userData.push(dataRow);
     }
     writeJsonToCsvFile(userData, longSummaryFile, LONG_SUMMARY_HEADERS);
+}
+
+function writeShortFormat(data) {
+    var sleepDays = data.filter(function(value) {
+        return (value.sleep_duration != null && value.sleep_duration != '');
+    });
+    var stepDays = data.filter(function(value) {
+        return (value.step_count != null && value.step_count != '' && value.step_count > 1);
+    });
+    writeJsonToCsvFile([{'STUDY_ID': user.studyId, 'JAWBONE_EMAIL': user.email, 'NUM_SLEEP_DAYS': sleepDays.length,
+        'NUM_STEP_DAYS': stepDays.length}], shortSummaryFile, SHORT_SUMMARY_HEADERS);
 }
 
 https.createServer(sslOptions, app).listen(port, function () {
