@@ -20,4 +20,12 @@ User.prototype.setGender = function (gender) {
     this.gender = gender;
 };
 
+User.prototype.setReason = function (reason) {
+    this.reason = reason;
+};
+
+User.prototype.setUserId = function (id) {
+    this.userId = id;
+};
+
 module.exports = User;

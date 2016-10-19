@@ -28,10 +28,10 @@ var express = require('express'),
         'meal_read', 'weight_read', 'generic_event_read', 'heartrate_read'],
     dataSummary = [], userDetails = [],
     downloadDone = false,
-    user, numSleepTicks, numMoveTicks,
+    user, numSleepTicks, numMoveTicks, reason,
     startDate, originalStartDate, wideSummaryFile, longSummaryFile, shortSummaryFile, timeBasedFilename,
     DATA_DIR, BASE_DATA_DIR, START_DATE, END_DATE, WIDE_SUMMARY_HEADERS, LONG_SUMMARY_HEADERS, SHORT_SUMMARY_HEADERS,
-    WAIT_TIME = 30000, MAX_RESULTS = 1000000, counter = 0, userCount = 0, moveCount = 0, sleepCount = 0,
+    WAIT_TIME = 60000, MAX_RESULTS = 1000000, counter = 0, userCount = 0, moveCount = 0, sleepCount = 0,
     LINUX_BASE_DIR = settings['LINUX_BASE_DIR'],
     WINDOWS_BASE_DIR = settings['WINDOWS_BASE_DIR'];
 
@@ -46,7 +46,7 @@ app.use(passport.initialize());
 var browser = new webdriver.Builder().usingServer().withCapabilities({'browserName': 'chrome' }).build();
 
 var lineReader = require('line-reader');
-lineReader.eachLine('config/test.csv', function(line, last) {
+lineReader.eachLine('config/subjects.csv', function(line, last) {
     userDetails.push(line);
     if (last) {
         downloadUserData(userDetails[0]);
@@ -57,8 +57,13 @@ lineReader.eachLine('config/test.csv', function(line, last) {
 var User = require('./user.js');
 
 function downloadUserData(userString) {
-    console.log('start user download for: ' + userCount);
     var userInfo = userString.split(',');
+    if (userInfo[4].indexOf('/') == -1 && userInfo[4].lastIndexOf('/') == -1) {
+        reason = userInfo[4];
+    } else {
+        reason = null;
+    }
+    console.log('start user download for user # ' + userCount + ' with ID ' + userInfo[0]);
     browser.get('https://localhost:5000/');
     browser.wait(function () {
         return browser.isElementPresent(webdriver.By.name('emaId'));
@@ -147,6 +152,7 @@ app.get('/logout', function (req, res) {
 
 app.get('/home', function (req, res) {
     user = new User(req.query['emaId'], req.query['email']);
+    user.setReason(reason);
     startDate = new Date(req.query['startDate']);
     originalStartDate = new Date(JSON.parse(JSON.stringify(startDate)));
     START_DATE = startDate.getTime()/1000;
@@ -180,15 +186,8 @@ passport.use('jawbone', new JawboneStrategy({
         user.setHeight(userData.height);
         user.setWeight(userData.weight);
         user.setGender(userData.gender ? 1 : 0); // false == 0 == male and true == 1 == female
+        user.setUserId(JSON.parse(body).meta['user_xid']);
     });
-
-    // up.trends.get({ bucket_size: "w", num_buckets: 1, end_date: formatDate(new Date(END_DATE)) }, function (err, body) {
-    //    console.log(JSON.parse(body));
-    //     var trends = JSON.parse(body).data;
-    //     for (var k = 0; k < trends.data.length; k++) {
-    //         console.log(trends.data[k]);
-    //     }
-    // });
 
     up.heartrates.get({start_time: START_DATE, end_time: END_DATE, limit: MAX_RESULTS}, function (err, body) {
         if (err) {
@@ -527,7 +526,7 @@ function generateCombinedSummaryHeaders() {
     LONG_SUMMARY_HEADERS = ['study_id', 'jawbone_email', 'gender', 'gender_label', 'height', 'weight', 'study_start_date',
     'day', 'resting_heartrate', 'sleep_duration', 'step_count'];
     writeHeaders(longSummaryFile, LONG_SUMMARY_HEADERS);
-    SHORT_SUMMARY_HEADERS = ['STUDY_ID', 'JAWBONE_EMAIL', 'NUM_SLEEP_DAYS', 'NUM_STEP_DAYS'];
+    SHORT_SUMMARY_HEADERS = ['USERID', 'SUBJECTID', 'JAWBONEEMAIL', 'NUMSLEEPDAYS', 'NUMSTEPDAYS', 'STARTDATE', 'REASON'];
     writeHeaders(shortSummaryFile, SHORT_SUMMARY_HEADERS);
 }
 
@@ -625,8 +624,16 @@ function writeShortFormat(data) {
     var stepDays = data.filter(function(value) {
         return (value.step_count != null && value.step_count != '' && value.step_count > 1);
     });
-    writeJsonToCsvFile([{'STUDY_ID': user.studyId, 'JAWBONE_EMAIL': user.email, 'NUM_SLEEP_DAYS': sleepDays.length,
-        'NUM_STEP_DAYS': stepDays.length}], shortSummaryFile, SHORT_SUMMARY_HEADERS);
+    if (user.reason != null) {
+        sleepDays = "-";
+        stepDays = "-";
+    } else {
+        sleepDays = sleepDays.length;
+        stepDays = stepDays.length;
+    }
+    writeJsonToCsvFile([{'USERID': user.userId, 'SUBJECTID': user.studyId, 'JAWBONEEMAIL': user.email,
+            'NUMSLEEPDAYS': sleepDays, 'NUMSTEPDAYS': stepDays, 'STARTDATE': originalStartDate.toLocaleDateString(),
+            'REASON': user.reason}], shortSummaryFile, SHORT_SUMMARY_HEADERS);
 }
 
 https.createServer(sslOptions, app).listen(port, function () {
