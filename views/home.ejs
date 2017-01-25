@@ -1,50 +1,11 @@
-<!doctype html>
-<html>
-<head>
-    <title>AdaptUp</title>
-    <style type="text/css">
-        body {
-            background: url(/images/background.jpg) top center #000 no-repeat;
-            background-size: cover;
-            font-family: Arial, sans-serif;
-            text-align: center;
-        }
+<% include header.html %>
 
-        h1 {
-            color: #fff;
-            font-size: 36px;
-        }
+<div class="row">
+  <p>
+    Please login to Jawbone using the user's Jawbone account credentials to 
+    download that user's activity and sleep data.
+  </p>
+  <a href="/login/jawbone" class="btn btn-primary">Jawbone login</a>
+</div>
 
-        .btn {
-            background-color: #001A57;
-            color: #fff;
-            display: block;
-            font-size: 24px;
-            margin: 30px auto;
-            padding: 10px;
-            text-decoration: none;
-            width: 40%;
-        }
-
-        .btn:hover {
-            background-color: #4169E1;
-        }
-
-        h4 {
-            font-style: italic;
-        }
-
-        p {
-            color: #fff;
-            display: block;
-            margin: 80px auto 40px;
-            width: 50%;
-        }
-    </style>
-</head>
-<body>
-<h1>AdaptUp</h1>
-<h4>Log in using Jawbone user credentials to download user's activity and sleep data.</h4>
-<a href="/login/jawbone" class="btn">Login</a>
-</body>
-</html>
+<% include footer.html %>

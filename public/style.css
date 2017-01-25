@@ -1,0 +1,18 @@
+.sleep-table {
+    background-color: rgba(81, 0, 255, 0.8);
+    border-collapse: collapse;
+    margin: 0 auto;
+    width: 60%;
+}
+
+.sleep-table tr th {
+    background: rgba(46, 23, 146, 1);
+}
+
+.sleep-table tr th,
+.sleep-table tr td {
+    border: 1px solid rgba(46, 23, 146, 1);
+    color: #fff;
+    font-weight: normal;
+    padding: 10px 25px;
+}
