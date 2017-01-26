@@ -3,6 +3,9 @@ app = express(),
 ejs = require('ejs'),
 https = require('https'),
 fs = require('fs'),
+archiver = require('archiver'),
+path = require('path'),
+mime = require('mime'),
 bodyParser = require('body-parser'),
 passport = require('passport'),
 JawboneStrategy = require('passport-oauth').OAuth2Strategy,
@@ -27,17 +30,15 @@ jawboneScopes = ['basic_read', 'extended_read', 'location_read',
 'generic_event_read', 'heartrate_read'],
 EMA_ID, USER_EMAIL, START_DATE, END_DATE, ACCESS_TOKEN, DATA_DIR, 
 BASE_DIR = settings['BASE_DIR'], MAX_RESULTS = 1000000,
-dataSummary = [], counter = 0;
+dataSummary = [], counter = 0, ZIP_FILE;
 
 app.use(bodyParser.json());
 app.use(express.static(__dirname + '/public'));
-
 app.set('view engine', 'ejs');
 app.set('views', __dirname + '/views');
-
 app.use(passport.initialize());
 
-app.get('/login/jawbone',
+app.get('/login/jawbone', 
 passport.authorize('jawbone', {
   scope: jawboneScopes,
   failureRedirect: '/'
@@ -61,6 +62,9 @@ app.get('/logout', function (req, res) {
 app.get('/home', function (req, res) {
   EMA_ID = req.query['emaId'];
   USER_EMAIL = req.query['email'];
+  if (!EMA_ID) {
+    EMA_ID = new Date().getTime().toString();
+  }
   var today = new Date();
   var startDate = req.query['startDate'];
   if (startDate) {
@@ -80,6 +84,30 @@ app.get('/home', function (req, res) {
 
 app.get('/', function (req, res) {
   res.render('index');
+});
+
+app.get('/download', function(req, res){
+  ZIP_FILE = fs.createWriteStream('data/' + EMA_ID + '.zip');
+  var archive = archiver('zip', { store: true });
+  
+  ZIP_FILE.on('close', function() {
+    console.log('The zip file has been finalized and is ready for download');
+    var file = 'data/' + EMA_ID + '.zip';
+    var filename = path.basename(file);
+    var mimetype = mime.lookup(file);
+    res.setHeader('Content-disposition', 'attachment; filename=' + filename);
+    res.setHeader('Content-type', mimetype);
+    var filestream = fs.createReadStream(file);
+    filestream.pipe(res);
+  });
+  
+  ZIP_FILE.on('error', function(err) {
+    console.log('Zip error: ' + err);
+  });
+
+  archive.pipe(ZIP_FILE);
+  archive.directory(DATA_DIR);
+  archive.finalize();
 });
 
 passport.use('jawbone', new JawboneStrategy({
@@ -112,9 +140,9 @@ passport.use('jawbone', new JawboneStrategy({
         heartRates[k]['ema_id'] = EMA_ID;
       }
       converter.json2csv(heartRates, function (err, csv) {
-        if (err) throw err;
+        if (err) console.log("Error converting heartrates data from json to csv");
         fs.writeFile(DATA_DIR + 'heartrates.csv', csv, function (err) {
-          if (err) throw err;
+          if (err) console.log("Error writing heartrates data to csv file");
           createSummaryObjects(heartRates);
         });
       }, {KEYS: heartRateHeaders});
@@ -137,9 +165,9 @@ passport.use('jawbone', new JawboneStrategy({
         jawboneData[k]['ema_id'] = EMA_ID;
       }
       converter.json2csv(jawboneData, function (err, csv) {
-        if (err) throw err;
+        if (err) console.log("Error converting workouts data from json to csv");
         fs.writeFile(DATA_DIR + 'workouts.csv', csv, function (err) {
-          if (err) throw err;
+          if (err) console.log("Error writing workouts data to csv file");
         });
       }, {KEYS: headers});
     }
@@ -166,9 +194,9 @@ passport.use('jawbone', new JawboneStrategy({
       }
       
       converter.json2csv(movesInfo, function (err, csv) {
-        if (err) throw err;
+        if (err) console.log("Error converting moves data from json to csv");
         fs.writeFile(DATA_DIR + 'moves.csv', csv, function (err) {
-          if (err) throw err;
+          if (err) console.log("Error writing moves data to csv");
           createSummaryObjects(movesInfo);
         });
       }, {KEYS: movesHeaders});
@@ -194,9 +222,9 @@ passport.use('jawbone', new JawboneStrategy({
       }
       
       converter.json2csv(sleepInfo, function (err, csv) {
-        if (err) throw err;
+        if (err) console.log("Error converting sleeps data from json to csv");
         fs.writeFile(DATA_DIR + 'sleep.csv', csv, function (err) {
-          if (err) throw err;
+          if (err) console.log("Error writing sleeps data to csv");
           createSummaryObjects(sleepInfo, function() {
             async.whilst(
               function () { return counter < 3; },
@@ -206,7 +234,7 @@ passport.use('jawbone', new JawboneStrategy({
                 }, 1000);
               },
               function (err, n) {
-                if (err) throw err;
+                if (err) console.log("Error in async task");
                 return done(null, { items: dataSummary, user: USER_EMAIL }, console.log('Data ready!'));
               }
             );
@@ -254,7 +282,7 @@ function getMoveTicksData(up, movesXID, first) {
   var ticksHeaders = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'moves_xid', 'distance', 'time_completed', 'active_time',
   'calories', 'steps', 'time', 'speed'];
   fs.writeFile(DATA_DIR + 'move_ticks.csv', ticksHeaders, function (err) {
-    if (err) throw err;
+    if (err) console.log("Error writing moves data to csv file");
   });
   if (first) {
     appendNewLine(DATA_DIR + 'move_ticks.csv')
@@ -277,7 +305,7 @@ function getMoveTicksData(up, movesXID, first) {
       converter.json2csv(ticksInfo, function (err, csv) {
         if (err) console.log(err);
         fs.appendFile(DATA_DIR + 'move_ticks.csv', csv, function (err) {
-          if (err) throw err;
+          if (err) console.log("Error appending moves data to csv file");
         });
       }, {KEYS: ticksHeaders, PREPEND_HEADER: false});
     }
@@ -287,7 +315,7 @@ function getMoveTicksData(up, movesXID, first) {
 function getSleepTicksData(up, sleepsXID, first) {
   var sleepTicksHeader = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'sleeps_xid', 'depth', 'time'];
   fs.writeFile(DATA_DIR + 'sleep_ticks.csv', sleepTicksHeader, function (err) {
-    if (err) throw err;
+    if (err) console.log("Error writing sleeps data to csv file");
   });
   if (first) {
     appendNewLine(DATA_DIR + 'sleep_ticks.csv')
@@ -310,7 +338,7 @@ function getSleepTicksData(up, sleepsXID, first) {
       converter.json2csv(ticksInfo, function (err, csv) {
         if (err) console.log(err);
         fs.appendFile(DATA_DIR + 'sleep_ticks.csv', csv, function (err) {
-          if (err) throw err;
+          if (err) console.log("Error appending sleeps data to csv file");
         });
       }, {KEYS: sleepTicksHeader, PREPEND_HEADER: false});
     }
@@ -319,7 +347,7 @@ function getSleepTicksData(up, sleepsXID, first) {
 
 function appendNewLine(filename) {
   fs.appendFile(filename, '\n', function (err) {
-    if (err) throw err;
+    if (err) console.log("Error appending new line to csv file");
   });
 }
 
@@ -348,9 +376,9 @@ function formatSeconds(durationInSeconds) {
 
 function writeSummarySheet() {
   converter.json2csv(dataSummary, function (err, csv) {
-    if (err) throw err;
+    if (err) console.log("Error converting summary json data to csv");
     fs.writeFile(DATA_DIR + 'summary.csv', csv, function (err) {
-      if (err) throw err;
+      if (err) console.log("Error writing summary data to csv file");
     });
   });
 }

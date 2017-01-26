@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js"
   },
-  "author": "Leonard Ngeno",
+  "author": "Leonard Ng'eno",
   "license": "MIT",
   "dependencies": {
     "ejs": "^2.3.1",
@@ -19,6 +19,9 @@
     "passport-oauth": "^1.0.0",
     "json-2-csv": "^2.0.0",
     "js-yaml": "3.5.5 ",
-    "async": "2.0.0-rc.2"
+    "async": "2.0.0-rc.2",
+    "archiver": "1.3.0",
+    "mime": "1.3.4",
+    "path": "0.12.7"
   }
 }

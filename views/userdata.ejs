@@ -1,32 +1,33 @@
 <% include header.html %>
 
-<div class="col-sm-2 pull-right">
-  <a href="/logout" class="btn btn-primary" id="adaptup-logout">Log out</a>
-</div>
-
-<div class="row">
-  <h1>Jawbone Data For <%= user %></h1>
-  <table class="sleep-table">
-    <thead>
-      <tr>
-        <th>Date</th>
-        <th>Amount of Sleep</th>
-        <th>Number of Steps Taken</th>
-        <th>Resting HeartRate</th>
-      </tr>
-    </thead>
-    <tbody>
-      
-      <% for (var i = 0; i < items.length; i++) { %>
+<div class="button-group">
+  <div class="col-sm-2 pull-right">
+    <a href="/logout" class="btn btn-primary btn-block">Log out</a>
+    <a href="/download" class="btn btn-primary btn-block">Download</a>
+  </div>
+  <div class="col-sm-10 pull-left">
+    <h1>Jawbone Data For <%= user %></h1>
+    <table class="sleep-table">
+      <thead>
         <tr>
-          <td><%= items[i].date %></td>
-          <td><%= items[i].sleep_duration %></td>
-          <td><%= items[i].step_count %></td>
-          <td><%= items[i].resting_heartrate %></td>
+          <th>Date</th>
+          <th>Amount of Sleep</th>
+          <th>Number of Steps Taken</th>
+          <th>Resting HeartRate</th>
         </tr>
-        <% } %>
-      </tbody>
-    </table>
+      </thead>
+      <tbody>
+        <% for (var i = 0; i < items.length; i++) { %>
+          <tr>
+            <td><%= items[i].date %></td>
+            <td><%= items[i].sleep_duration %></td>
+            <td><%= items[i].step_count %></td>
+            <td><%= items[i].resting_heartrate %></td>
+          </tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
   </div>
   
-<% include footer.html %>
+  <% include footer.html %>
