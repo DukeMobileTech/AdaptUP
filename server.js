@@ -3,6 +3,8 @@ app = express(),
 ejs = require('ejs'),
 https = require('https'),
 fs = require('fs'),
+winston = require('winston'),
+expressWinston = require('express-winston'),
 archiver = require('archiver'),
 path = require('path'),
 mime = require('mime'),
@@ -19,11 +21,11 @@ jawboneAuth = {
   clientSecret: settings['clientSecret'],
   authorizationURL: 'https://jawbone.com/auth/oauth2/auth',
   tokenURL: 'https://jawbone.com/auth/oauth2/token',
-  callbackURL: 'https://localhost:5000/sleepdata'
+  callbackURL: settings['callbackURL']
 },
 sslOptions = {
-  key: fs.readFileSync('config/server.key'),
-  cert: fs.readFileSync('config/server.crt')
+  key: fs.readFileSync(settings['serverKey']),
+  cert: fs.readFileSync(settings['serverCert'])
 },
 jawboneScopes = ['basic_read', 'extended_read', 'location_read', 
 'mood_read', 'sleep_read', 'move_read', 'meal_read', 'weight_read', 
@@ -31,6 +33,32 @@ jawboneScopes = ['basic_read', 'extended_read', 'location_read',
 EMA_ID, USER_EMAIL, START_DATE, END_DATE, ACCESS_TOKEN, DATA_DIR, 
 BASE_DIR = settings['BASE_DIR'], MAX_RESULTS = 1000000,
 dataSummary = [], counter = 0, ZIP_FILE;
+
+expressWinston.requestWhitelist = ['url', 'method', 'originalUrl', 'query'];
+var router = express.Router();
+app.use(expressWinston.logger({
+  transports: [
+    new winston.transports.Console({
+      json: true,
+      colorize: true,
+      timestamp: true,
+      level: 'info'
+    })
+  ]
+}));
+
+app.use(router);
+
+app.use(expressWinston.errorLogger({
+  transports: [
+    new winston.transports.Console({
+      json: true,
+      colorize: true,
+      timestamp: true,
+      level: 'info'
+    })
+  ]
+}));
 
 app.use(bodyParser.json());
 app.use(express.static(__dirname + '/public'));
@@ -45,7 +73,7 @@ passport.authorize('jawbone', {
 })
 );
 
-app.get('/sleepdata',
+app.get('/summary',
 passport.authorize('jawbone', {
   scope: jawboneScopes,
   failureRedirect: '/'
@@ -133,19 +161,21 @@ passport.use('jawbone', new JawboneStrategy({
       var heartRateHeaders = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'xid', 'title', 'place_lon', 'place_lat', 'place_acc', 'place_name',
       'time_created', 'time_updated', 'date', 'resting_heartrate', 'details.tz', 'details.sunrise', 'details.sunset'];
       var heartRates = JSON.parse(body).data.items;
-      for (var k = 0; k < heartRates.length; k++) {
-        heartRates[k]['user_xid'] = JSON.parse(body).meta['user_xid'];
-        heartRates[k]['time_accessed'] = JSON.parse(body).meta['time'];
-        heartRates[k]['user_email'] = USER_EMAIL;
-        heartRates[k]['ema_id'] = EMA_ID;
+      if (heartRates) {
+        for (var k = 0; k < heartRates.length; k++) {
+          heartRates[k]['user_xid'] = JSON.parse(body).meta['user_xid'];
+          heartRates[k]['time_accessed'] = JSON.parse(body).meta['time'];
+          heartRates[k]['user_email'] = USER_EMAIL;
+          heartRates[k]['ema_id'] = EMA_ID;
+        }
+        converter.json2csv(heartRates, function (err, csv) {
+          if (err) console.log("Error converting heartrates data from json to csv");
+          fs.writeFile(DATA_DIR + 'heartrates.csv', csv, function (err) {
+            if (err) console.log("Error writing heartrates data to csv file");
+            createSummaryObjects(heartRates);
+          });
+        }, {KEYS: heartRateHeaders});
       }
-      converter.json2csv(heartRates, function (err, csv) {
-        if (err) console.log("Error converting heartrates data from json to csv");
-        fs.writeFile(DATA_DIR + 'heartrates.csv', csv, function (err) {
-          if (err) console.log("Error writing heartrates data to csv file");
-          createSummaryObjects(heartRates);
-        });
-      }, {KEYS: heartRateHeaders});
     }
   });
   
@@ -158,18 +188,20 @@ passport.use('jawbone', new JawboneStrategy({
       'details.time', 'details.tz', 'details.bg_active_time', 'details.calories', 'details.bmr_calories',
       'details.bmr', 'details.bg_calories', 'details.meters', 'details.km', 'details.intensity'];
       var jawboneData = JSON.parse(body).data.items;
-      for (var k = 0; k < jawboneData.length; k++) {
-        jawboneData[k]['user_xid'] = JSON.parse(body).meta['user_xid'];
-        jawboneData[k]['time_accessed'] = JSON.parse(body).meta['time'];
-        jawboneData[k]['user_email'] = USER_EMAIL;
-        jawboneData[k]['ema_id'] = EMA_ID;
+      if (jawboneData) {
+        for (var k = 0; k < jawboneData.length; k++) {
+          jawboneData[k]['user_xid'] = JSON.parse(body).meta['user_xid'];
+          jawboneData[k]['time_accessed'] = JSON.parse(body).meta['time'];
+          jawboneData[k]['user_email'] = USER_EMAIL;
+          jawboneData[k]['ema_id'] = EMA_ID;
+        }
+        converter.json2csv(jawboneData, function (err, csv) {
+          if (err) console.log("Error converting workouts data from json to csv");
+          fs.writeFile(DATA_DIR + 'workouts.csv', csv, function (err) {
+            if (err) console.log("Error writing workouts data to csv file");
+          });
+        }, {KEYS: headers});
       }
-      converter.json2csv(jawboneData, function (err, csv) {
-        if (err) console.log("Error converting workouts data from json to csv");
-        fs.writeFile(DATA_DIR + 'workouts.csv', csv, function (err) {
-          if (err) console.log("Error writing workouts data to csv file");
-        });
-      }, {KEYS: headers});
     }
   });
   
@@ -182,24 +214,24 @@ passport.use('jawbone', new JawboneStrategy({
       'details.inactive_time', 'details.longest_idle', 'details.calories', 'details.bmr_day', 'details.bmr',
       'details.bg_calories', 'details.wo_calories', 'details.wo_time', 'details.wo_active_time', 'details.wo_count',
       'details.wo_longest', 'details.sunrise', 'details.sunset', 'details.tz'];
-      
       var movesInfo = JSON.parse(body).data.items;
-      for (var k = 0; k < movesInfo.length; k++) {
-        movesInfo[k]['user_xid'] = JSON.parse(body).meta['user_xid'];
-        movesInfo[k]['user_email'] = USER_EMAIL;
-        movesInfo[k]['ema_id'] = EMA_ID;
-        movesInfo[k]['time_accessed'] = JSON.parse(body).meta['time'];
-        movesInfo[k]['title'] = movesInfo[k]['title'].replace(',', '');
-        getMoveTicksData(up, movesInfo[k]['xid'], k == 0);
+      if (movesInfo) {
+        for (var k = 0; k < movesInfo.length; k++) {
+          movesInfo[k]['user_xid'] = JSON.parse(body).meta['user_xid'];
+          movesInfo[k]['user_email'] = USER_EMAIL;
+          movesInfo[k]['ema_id'] = EMA_ID;
+          movesInfo[k]['time_accessed'] = JSON.parse(body).meta['time'];
+          movesInfo[k]['title'] = movesInfo[k]['title'].replace(',', '');
+          getMoveTicksData(up, movesInfo[k]['xid'], k == 0);
+        }
+        converter.json2csv(movesInfo, function (err, csv) {
+          if (err) console.log("Error converting moves data from json to csv");
+          fs.writeFile(DATA_DIR + 'moves.csv', csv, function (err) {
+            if (err) console.log("Error writing moves data to csv");
+            createSummaryObjects(movesInfo);
+          });
+        }, {KEYS: movesHeaders});
       }
-      
-      converter.json2csv(movesInfo, function (err, csv) {
-        if (err) console.log("Error converting moves data from json to csv");
-        fs.writeFile(DATA_DIR + 'moves.csv', csv, function (err) {
-          if (err) console.log("Error writing moves data to csv");
-          createSummaryObjects(movesInfo);
-        });
-      }, {KEYS: movesHeaders});
     }
   });
   
@@ -211,36 +243,36 @@ passport.use('jawbone', new JawboneStrategy({
       'date', 'place_lat', 'place_lon', 'place_acc', 'place_name', 'details.smart_alarm_fire', 'details.awake_time',
       'details.asleep_time', 'details.awakenings', 'details.rem', 'details.light', 'details.deep', 'details.awake',
       'details.duration', 'details.tz'];
-      
       var sleepInfo = JSON.parse(body).data.items;
-      for (var k = 0; k < sleepInfo.length; k++) {
-        sleepInfo[k]['user_xid'] = JSON.parse(body).meta['user_xid'];
-        sleepInfo[k]['time_accessed'] = JSON.parse(body).meta['time'];
-        sleepInfo[k]['user_email'] = USER_EMAIL;
-        sleepInfo[k]['ema_id'] = EMA_ID;
-        getSleepTicksData(up, sleepInfo[k]['xid'], k == 0);
-      }
-      
-      converter.json2csv(sleepInfo, function (err, csv) {
-        if (err) console.log("Error converting sleeps data from json to csv");
-        fs.writeFile(DATA_DIR + 'sleep.csv', csv, function (err) {
-          if (err) console.log("Error writing sleeps data to csv");
-          createSummaryObjects(sleepInfo, function() {
-            async.whilst(
-              function () { return counter < 3; },
-              function (callback) {
-                setTimeout(function () {
-                  callback(null, counter);
-                }, 1000);
-              },
-              function (err, n) {
-                if (err) console.log("Error in async task");
-                return done(null, { items: dataSummary, user: USER_EMAIL }, console.log('Data ready!'));
-              }
-            );
+      if (sleepInfo) {
+        for (var k = 0; k < sleepInfo.length; k++) {
+          sleepInfo[k]['user_xid'] = JSON.parse(body).meta['user_xid'];
+          sleepInfo[k]['time_accessed'] = JSON.parse(body).meta['time'];
+          sleepInfo[k]['user_email'] = USER_EMAIL;
+          sleepInfo[k]['ema_id'] = EMA_ID;
+          getSleepTicksData(up, sleepInfo[k]['xid'], k == 0);
+        }
+        converter.json2csv(sleepInfo, function (err, csv) {
+          if (err) console.log("Error converting sleeps data from json to csv");
+          fs.writeFile(DATA_DIR + 'sleep.csv', csv, function (err) {
+            if (err) console.log("Error writing sleeps data to csv");
+            createSummaryObjects(sleepInfo, function() {
+              async.whilst(
+                function () { return counter < 3; },
+                function (callback) {
+                  setTimeout(function () {
+                    callback(null, counter);
+                  }, 1000);
+                },
+                function (err, n) {
+                  if (err) console.log("Error in async task");
+                  return done(null, { items: dataSummary, user: USER_EMAIL }, console.log('Data ready!'));
+                }
+              );
+            });
           });
-        });
-      }, {KEYS: sleepHeader});
+        }, {KEYS: sleepHeader});
+      }
     }
   });
 }));
@@ -295,19 +327,21 @@ function getMoveTicksData(up, movesXID, first) {
       var ticksInfo = JSON.parse(moveBody).data.items;
       var ticksAccessTime = JSON.parse(moveBody).meta['time'];
       var userXID = JSON.parse(moveBody).meta['user_xid'];
-      for (var j = 0; j < ticksInfo.length; j++) {
-        ticksInfo[j]['user_xid'] = userXID;
-        ticksInfo[j]['time_accessed'] = ticksAccessTime;
-        ticksInfo[j]['moves_xid'] = movesXID;
-        ticksInfo[j]['user_email'] = USER_EMAIL;
-        ticksInfo[j]['ema_id'] = EMA_ID;
+      if (ticksInfo) {
+        for (var j = 0; j < ticksInfo.length; j++) {
+          ticksInfo[j]['user_xid'] = userXID;
+          ticksInfo[j]['time_accessed'] = ticksAccessTime;
+          ticksInfo[j]['moves_xid'] = movesXID;
+          ticksInfo[j]['user_email'] = USER_EMAIL;
+          ticksInfo[j]['ema_id'] = EMA_ID;
+        }
+        converter.json2csv(ticksInfo, function (err, csv) {
+          if (err) console.log(err);
+          fs.appendFile(DATA_DIR + 'move_ticks.csv', csv, function (err) {
+            if (err) console.log("Error appending moves data to csv file");
+          });
+        }, {KEYS: ticksHeaders, PREPEND_HEADER: false});
       }
-      converter.json2csv(ticksInfo, function (err, csv) {
-        if (err) console.log(err);
-        fs.appendFile(DATA_DIR + 'move_ticks.csv', csv, function (err) {
-          if (err) console.log("Error appending moves data to csv file");
-        });
-      }, {KEYS: ticksHeaders, PREPEND_HEADER: false});
     }
   });
 }
@@ -328,19 +362,21 @@ function getSleepTicksData(up, sleepsXID, first) {
       var ticksInfo = JSON.parse(body).data.items;
       var ticksAccessTime = JSON.parse(body).meta['time'];
       var userXID = JSON.parse(body).meta['user_xid'];
-      for (var j = 0; j < ticksInfo.length; j++) {
-        ticksInfo[j]['user_xid'] = userXID;
-        ticksInfo[j]['time_accessed'] = ticksAccessTime;
-        ticksInfo[j]['sleeps_xid'] = sleepsXID;
-        ticksInfo[j]['user_email'] = USER_EMAIL;
-        ticksInfo[j]['ema_id'] = EMA_ID;
+      if (ticksInfo) {
+        for (var j = 0; j < ticksInfo.length; j++) {
+          ticksInfo[j]['user_xid'] = userXID;
+          ticksInfo[j]['time_accessed'] = ticksAccessTime;
+          ticksInfo[j]['sleeps_xid'] = sleepsXID;
+          ticksInfo[j]['user_email'] = USER_EMAIL;
+          ticksInfo[j]['ema_id'] = EMA_ID;
+        }
+        converter.json2csv(ticksInfo, function (err, csv) {
+          if (err) console.log(err);
+          fs.appendFile(DATA_DIR + 'sleep_ticks.csv', csv, function (err) {
+            if (err) console.log("Error appending sleeps data to csv file");
+          });
+        }, {KEYS: sleepTicksHeader, PREPEND_HEADER: false});
       }
-      converter.json2csv(ticksInfo, function (err, csv) {
-        if (err) console.log(err);
-        fs.appendFile(DATA_DIR + 'sleep_ticks.csv', csv, function (err) {
-          if (err) console.log("Error appending sleeps data to csv file");
-        });
-      }, {KEYS: sleepTicksHeader, PREPEND_HEADER: false});
     }
   });
 }
