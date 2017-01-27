@@ -1,42 +1,56 @@
 <% include header.html %>
 
 <div class="row">
-  <form class="form-horizontal" action="/home" method="get">
-    <div class="form-group">
-      <label for="emaId" class="col-sm-2 control-label">EMA ID:</label>
-      <div class="col-sm-10">
-        <input type="text" id="emaId" name="emaId" placeholder="Enter EMA ID" required class="form-control"/>
-      </div>
+  <div class="alert alert-warning alert-dismissible" role="alert">
+    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+      <span aria-hidden="true">&times;</span>
+    </button>
+    <strong>Thou shalt not mix data!</strong> 
+    <p>
+      Log out the current/previous user from <a href="https://jawbone.com/">
+        Jawbone</a> before trying to download data belonging to a different user 
+        from the one currently logged in on the Jawbone website.
+      </p>
     </div>
-    <div class="form-group">
-      <label for="email" class="col-sm-2 control-label">Jawbone Email:</label>
-      <div class="col-sm-10">
-        <input type="text" id="email" name="email" placeholder="Jawbone Email" required class="form-control"/>
+  </div>
+  
+  <div class="row">
+    <form class="form-horizontal" action="/home" method="get">
+      <div class="form-group">
+        <label for="emaId" class="col-sm-2 control-label">EMA ID:</label>
+        <div class="col-sm-10">
+          <input type="text" id="emaId" name="emaId" placeholder="Enter EMA ID" required class="form-control"/>
+        </div>
       </div>
-    </div>
-    <div class="form-group">
-      <label for="start-date" class="col-sm-2 control-label">Start Date:</label>
-      <div class="col-sm-10">
-        <input type="text" id="startDate" name="startDate" placeholder="MM/DD/YYYY" class="form-control"
-        pattern="(0[1-9]|1[012])[- /.](0[1-9]|[12][0-9]|3[01])[- /.](19|20)\d\d"/>
+      <div class="form-group">
+        <label for="email" class="col-sm-2 control-label">Jawbone Email:</label>
+        <div class="col-sm-10">
+          <input type="text" id="email" name="email" placeholder="Jawbone Email" required class="form-control"/>
+        </div>
       </div>
-    </div>
-    <div class="form-group">
-      <label for="end-date" class="col-sm-2 control-label">End Date:</label>
-      <div class="col-sm-10">
-        <input type="text" id="endDate" name="endDate" placeholder="MM/DD/YYYY" class="form-control"
-        pattern="(0[1-9]|1[012])[- /.](0[1-9]|[12][0-9]|3[01])[- /.](19|20)\d\d"/>
+      <div class="form-group">
+        <label for="start-date" class="col-sm-2 control-label">Start Date:</label>
+        <div class="col-sm-10">
+          <input type="text" id="startDate" name="startDate" placeholder="MM/DD/YYYY" class="form-control"
+          pattern="(0[1-9]|1[012])[- /.](0[1-9]|[12][0-9]|3[01])[- /.](19|20)\d\d"/>
+        </div>
       </div>
-    </div>
-    <div class="form-group">
-      <div class="col-sm-6 pull-right">
-        <input type="submit" value="Next" class="btn btn-primary" />
+      <div class="form-group">
+        <label for="end-date" class="col-sm-2 control-label">End Date:</label>
+        <div class="col-sm-10">
+          <input type="text" id="endDate" name="endDate" placeholder="MM/DD/YYYY" class="form-control"
+          pattern="(0[1-9]|1[012])[- /.](0[1-9]|[12][0-9]|3[01])[- /.](19|20)\d\d"/>
+        </div>
       </div>
-      <div class="col-sm-6 pull-left">
-        <input type="submit" value="Skip" class="btn btn-primary" formnovalidate />
+      <div class="form-group">
+        <div class="col-sm-6 pull-right">
+          <input type="submit" value="Next" class="btn btn-primary" />
+        </div>
+        <div class="col-sm-6 pull-left">
+          <input type="submit" value="Skip" class="btn btn-primary" formnovalidate />
+        </div>
       </div>
-    </div>
-  </form>
-</div>
-
-<% include footer.html %>
+    </form>
+  </div>
+  
+  <% include footer.html %>

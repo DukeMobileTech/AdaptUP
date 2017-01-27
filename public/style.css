@@ -1,18 +1,25 @@
 .sleep-table {
-    background-color: rgba(81, 0, 255, 0.8);
-    border-collapse: collapse;
-    margin: 0 auto;
-    width: 90%;
+  background-color: rgba(81, 0, 255, 0.8);
+  border-collapse: collapse;
+  margin: 0 auto;
+  width: 90%;
 }
 
 .sleep-table tr th {
-    background: rgba(46, 23, 146, 1);
+  background: rgba(46, 23, 146, 1);
 }
 
 .sleep-table tr th,
 .sleep-table tr td {
-    border: 1px solid rgba(46, 23, 146, 1);
-    color: #fff;
-    font-weight: normal;
-    padding: 10px 25px;
+  border: 1px solid rgba(46, 23, 146, 1);
+  color: #fff;
+  font-weight: normal;
+  padding: 10px 25px;
+}
+
+.header-box {
+  margin-bottom: 20px;
+}
+.align-text-bottom{
+  padding-top: 30px;
 }
