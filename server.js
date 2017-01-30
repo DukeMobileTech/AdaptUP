@@ -66,28 +66,30 @@ app.set('view engine', 'ejs');
 app.set('views', __dirname + '/views');
 app.use(passport.initialize());
 
-app.get('/login/jawbone', 
+var subApp = express();
+
+subApp.get('/login/jawbone', 
 passport.authorize('jawbone', {
   scope: jawboneScopes,
-  failureRedirect: '/'
+  failureRedirect: '/adaptup'
 })
 );
 
-app.get('/summary',
+subApp.get('/summary',
 passport.authorize('jawbone', {
   scope: jawboneScopes,
-  failureRedirect: '/'
+  failureRedirect: '/adaptup'
 }), function (req, res) {
   res.render('userdata', req.account);
 }
 );
 
-app.get('/logout', function (req, res) {
+subApp.get('/logout', function (req, res) {
   req.logout();
-  res.redirect('/');
+  res.redirect('/adaptup');
 });
 
-app.get('/home', function (req, res) {
+subApp.get('/home', function (req, res) {
   EMA_ID = req.query['emaId'];
   USER_EMAIL = req.query['email'];
   if (!EMA_ID) {
@@ -110,11 +112,11 @@ app.get('/home', function (req, res) {
   res.render('home');
 });
 
-app.get('/', function (req, res) {
+subApp.get('/', function (req, res) {
   res.render('index');
 });
 
-app.get('/download', function(req, res){
+subApp.get('/download', function(req, res){
   ZIP_FILE = fs.createWriteStream('data/' + EMA_ID + '.zip');
   var archive = archiver('zip', { store: true });
   
@@ -137,6 +139,8 @@ app.get('/download', function(req, res){
   archive.directory(DATA_DIR);
   archive.finalize();
 });
+
+app.use('/adaptup', subApp);
 
 passport.use('jawbone', new JawboneStrategy({
   clientID: jawboneAuth.clientID,
