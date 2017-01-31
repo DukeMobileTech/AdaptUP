@@ -1,7 +1,6 @@
 var express = require('express'),
 app = express(),
 ejs = require('ejs'),
-https = require('https'),
 fs = require('fs'),
 winston = require('winston'),
 expressWinston = require('express-winston'),
@@ -134,10 +133,14 @@ subApp.get('/download', function(req, res){
   ZIP_FILE.on('error', function(err) {
     console.log('Zip error: ' + err);
   });
-
+  
   archive.pipe(ZIP_FILE);
   archive.directory(DATA_DIR);
   archive.finalize();
+});
+
+app.get('/', function(req, res) {
+  res.redirect('/adaptup');
 });
 
 app.use('/adaptup', subApp);
@@ -432,6 +435,14 @@ function compare(objA, objB) {
   return 0;
 }
 
-https.createServer(sslOptions, app).listen(port, function () {
-  console.log('AdaptUP server listening on ' + port);
-});
+if (app.settings.env == 'production') {
+  var http = require('http');
+  http.createServer(app).listen(port, function() {
+    console.log('AdaptUP ' + app.settings.env + ' server listening on ' + port);
+  });
+} else {
+  var https = require('https');
+  https.createServer(sslOptions, app).listen(port, function () {
+    console.log('AdaptUP ' + app.settings.env + ' server listening on ' + port);
+  });  
+}
