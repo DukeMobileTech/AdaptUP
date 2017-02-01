@@ -1,5 +1,5 @@
-# config valid only for current version of Capistrano
-lock '3.2.1'
+# config valid only for current version of Capistrano 
+lock '3.6.1'
 
 set :application, 'adaptup'
 set :repo_url, 'git@github.com:DukeMobileTech/AdaptUP.git'
@@ -9,13 +9,6 @@ set :pty, true
 set :linked_files, ['config/settings.yml']
 set :linked_dirs, %w(data tmp log)
 set :keep_releases, 5
-
-# namespace :npm do
-#   desc 'Runs npm install'
-#   on roles(:app), :except => { :no_release => true } do
-#     execute "cd #{latest_release} && npm install"
-#   end
-# end
 
 namespace :deploy do
   desc 'Restart Application'
