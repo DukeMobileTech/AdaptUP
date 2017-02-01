@@ -66,6 +66,7 @@ app.set('views', __dirname + '/views');
 app.use(passport.initialize());
 
 var subApp = express();
+subApp.use(express.static(__dirname + '/public'));
 
 subApp.get('/login/jawbone', 
 passport.authorize('jawbone', {
