@@ -1,6 +1,8 @@
-# Logs
+# Logs and temp 
 logs
+log
 *.log
+tmp
 
 # Runtime data
 pids
@@ -28,6 +30,7 @@ node_modules
 
 # sensitive files
 config/*
+!config/deploy.rb
 
 # user data
 data/*
