@@ -11,9 +11,47 @@ var jawboneAuth = {
     tokenURL: 'https://jawbone.com/auth/oauth2/token',
     callbackURL: settings['callbackURL']
 };
-var startDate, endDate, userEmail, emaID, dataDir;
-var counter = 0;
-var dataSummary = [];
+var startDate, endDate, userEmail, emaID, dataDir, up, counter;
+var dataSummary = [],
+    moveIdentifiers = [],
+    sleepIdentifiers = [],
+    moveTicksData = [],
+    sleepTicksData = [];
+var moveCounter = 0,
+    sleepCounter = 0;
+const HR_HEADERS = ['user_xid', 'user_email', 'ema_id', 'time_accessed',
+    'xid', 'title', 'place_lon', 'place_lat', 'place_acc', 'place_name',
+    'time_created', 'time_updated', 'date', 'resting_heartrate', 'details.tz',
+    'details.sunrise', 'details.sunset'
+];
+const WORKOUT_HEADERS = ['user_xid', 'user_email', 'ema_id', 'time_accessed',
+    'xid', 'title', 'type', 'sub_type', 'place_lon', 'place_lat', 'place_acc',
+    'place_name', 'time_created', 'time_updated', 'time_completed', 'date',
+    'details.steps', 'details.time', 'details.tz', 'details.bg_active_time',
+    'details.calories', 'details.bmr_calories', 'details.bmr',
+    'details.bg_calories', 'details.meters', 'details.km', 'details.intensity'
+];
+const MOVE_HEADERS = ['user_xid', 'user_email', 'ema_id', 'time_accessed',
+    'xid', 'title', 'type', 'time_created', 'time_updated', 'time_completed',
+    'date', 'details.distance', 'details.km', 'details.steps',
+    'details.active_time', 'details.longest_active', 'details.inactive_time',
+    'details.longest_idle', 'details.calories', 'details.bmr_day', 'details.bmr',
+    'details.bg_calories', 'details.wo_calories', 'details.wo_time',
+    'details.wo_active_time', 'details.wo_count', 'details.wo_longest',
+    'details.sunrise', 'details.sunset', 'details.tz'
+];
+const SLEEP_HEADERS = ['user_xid', 'user_email', 'ema_id', 'time_accessed',
+    'xid', 'title', 'sub_type', 'time_created', 'time_completed', 'date',
+    'place_lat', 'place_lon', 'place_acc', 'place_name',
+    'details.smart_alarm_fire', 'details.awake_time', 'details.asleep_time',
+    'details.awakenings', 'details.rem', 'details.light', 'details.deep',
+    'details.awake', 'details.duration', 'details.tz'
+];
+const MOVE_TICKS_HEADERS = ['user_xid', 'user_email', 'ema_id', 'time_accessed',
+    'distance', 'time_completed', 'active_time', 'calories', 'steps', 'time', 'speed'
+];
+const SLEEP_TICKS_HEADERS = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'depth', 'time'];
+const SUMMARY_HEADERS = ['date', 'resting_heartrate', 'step_count', 'sleep_duration'];
 
 exports.setStartDate = function(date) {
     startDate = date;
@@ -41,236 +79,150 @@ exports.jawboneStrategy = new JawboneStrategy(jawboneAuth, function(token, refre
         client_id: jawboneAuth.clientID,
         client_secret: jawboneAuth.clientSecret
     };
-    var up = require('jawbone-up')(options);
+    up = require('jawbone-up')(options);
     var params = {
         start_time: startDate,
         end_time: endDate,
         limit: 1000000
     };
+    counter = 0;
 
     up.heartrates.get(params, function(err, body) {
-        if (err) {
-            console.log('Error receiving Jawbone UP data');
-        } else {
-            var heartRateHeaders = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'xid', 'title', 'place_lon', 'place_lat', 'place_acc', 'place_name',
-                'time_created', 'time_updated', 'date', 'resting_heartrate', 'details.tz', 'details.sunrise', 'details.sunset'
-            ];
-            var heartRates = JSON.parse(body).data.items;
-            if (heartRates) {
-                for (var k = 0; k < heartRates.length; k++) {
-                    heartRates[k]['user_xid'] = JSON.parse(body).meta['user_xid'];
-                    heartRates[k]['time_accessed'] = JSON.parse(body).meta['time'];
-                    heartRates[k]['user_email'] = userEmail;
-                    heartRates[k]['ema_id'] = emaID;
-                }
-                jsonToCsv.json2csv(heartRates, function(err, csv) {
-                    if (err) console.log("Error converting heartrates data from json to csv");
-                    fs.writeFile(dataDir + 'heartrates.csv', csv, function(err) {
-                        if (err) console.log("Error writing heartrates data to csv file");
-                        createSummaryObjects(heartRates);
-                    });
-                }, {
-                    KEYS: heartRateHeaders
-                });
-            }
-        }
+        parseData(HR_HEADERS, 'heartrates.csv', err, body, false);
     });
 
     up.workouts.get(params, function(err, body) {
-        if (err) {
-            console.log('Error receiving Jawbone UP data');
-        } else {
-            var headers = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'xid', 'title', 'type', 'sub_type', 'place_lon', 'place_lat',
-                'place_acc', 'place_name', 'time_created', 'time_updated', 'time_completed', 'date', 'details.steps',
-                'details.time', 'details.tz', 'details.bg_active_time', 'details.calories', 'details.bmr_calories',
-                'details.bmr', 'details.bg_calories', 'details.meters', 'details.km', 'details.intensity'
-            ];
-            var jawboneData = JSON.parse(body).data.items;
-            if (jawboneData) {
-                for (var k = 0; k < jawboneData.length; k++) {
-                    jawboneData[k]['user_xid'] = JSON.parse(body).meta['user_xid'];
-                    jawboneData[k]['time_accessed'] = JSON.parse(body).meta['time'];
-                    jawboneData[k]['user_email'] = userEmail;
-                    jawboneData[k]['ema_id'] = emaID;
-                }
-                jsonToCsv.json2csv(jawboneData, function(err, csv) {
-                    if (err) console.log("Error converting workouts data from json to csv");
-                    fs.writeFile(dataDir + 'workouts.csv', csv, function(err) {
-                        if (err) console.log("Error writing workouts data to csv file");
-                    });
-                }, {
-                    KEYS: headers
-                });
-            }
-        }
+        parseData(WORKOUT_HEADERS, 'workouts.csv', err, body, false);
     });
 
     up.moves.get(params, function(err, body) {
-        if (err) {
-            console.log('Error receiving Jawbone UP data');
-        } else {
-            var movesHeaders = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'xid', 'title', 'type', 'time_created', 'time_updated', 'time_completed', 'date',
-                'details.distance', 'details.km', 'details.steps', 'details.active_time', 'details.longest_active',
-                'details.inactive_time', 'details.longest_idle', 'details.calories', 'details.bmr_day', 'details.bmr',
-                'details.bg_calories', 'details.wo_calories', 'details.wo_time', 'details.wo_active_time', 'details.wo_count',
-                'details.wo_longest', 'details.sunrise', 'details.sunset', 'details.tz'
-            ];
-            var movesInfo = JSON.parse(body).data.items;
-            if (movesInfo) {
-                for (var k = 0; k < movesInfo.length; k++) {
-                    movesInfo[k]['user_xid'] = JSON.parse(body).meta['user_xid'];
-                    movesInfo[k]['user_email'] = userEmail;
-                    movesInfo[k]['ema_id'] = emaID;
-                    movesInfo[k]['time_accessed'] = JSON.parse(body).meta['time'];
-                    movesInfo[k]['title'] = movesInfo[k]['title'].replace(',', '');
-                    getMoveTicksData(up, movesInfo[k]['xid'], k == 0);
-                }
-                jsonToCsv.json2csv(movesInfo, function(err, csv) {
-                    if (err) console.log("Error converting moves data from json to csv");
-                    fs.writeFile(dataDir + 'moves.csv', csv, function(err) {
-                        if (err) console.log("Error writing moves data to csv");
-                        createSummaryObjects(movesInfo);
-                    });
-                }, {
-                    KEYS: movesHeaders
-                });
-            }
-        }
+        parseData(MOVE_HEADERS, 'moves.csv', err, body, true);
     });
 
     up.sleeps.get(params, function(err, body) {
-        if (err) {
-            console.log('Error receiving Jawbone UP data');
-        } else {
-            var sleepHeader = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'xid', 'title', 'sub_type', 'time_created', 'time_completed',
-                'date', 'place_lat', 'place_lon', 'place_acc', 'place_name', 'details.smart_alarm_fire', 'details.awake_time',
-                'details.asleep_time', 'details.awakenings', 'details.rem', 'details.light', 'details.deep', 'details.awake',
-                'details.duration', 'details.tz'
-            ];
-            var sleepInfo = JSON.parse(body).data.items;
-            if (sleepInfo) {
-                for (var k = 0; k < sleepInfo.length; k++) {
-                    sleepInfo[k]['user_xid'] = JSON.parse(body).meta['user_xid'];
-                    sleepInfo[k]['time_accessed'] = JSON.parse(body).meta['time'];
-                    sleepInfo[k]['user_email'] = userEmail;
-                    sleepInfo[k]['ema_id'] = emaID;
-                    getSleepTicksData(up, sleepInfo[k]['xid'], k == 0);
-                }
-                jsonToCsv.json2csv(sleepInfo, function(err, csv) {
-                    if (err) console.log("Error converting sleeps data from json to csv");
-                    fs.writeFile(dataDir + 'sleep.csv', csv, function(err) {
-                        if (err) console.log("Error writing sleeps data to csv");
-                        createSummaryObjects(sleepInfo, function() {
-                            asyncFun.whilst(
-                                function() {
-                                    return counter < 3;
-                                },
-                                function(callback) {
-                                    setTimeout(function() {
-                                        callback(null, counter);
-                                    }, 1000);
-                                },
-                                function(err, n) {
-                                    if (err) console.log("Error in async task");
-                                    return done(null, {
-                                        items: dataSummary,
-                                        user: userEmail
-                                    }, console.log('Data ready!'));
-                                }
-                            );
-                        });
-                    });
-                }, {
-                    KEYS: sleepHeader
-                });
-            }
-        }
+        parseData(SLEEP_HEADERS, 'sleep.csv', err, body, true);
     });
+
+    asyncFun.whilst(
+        function() {
+            return counter < 4;
+        },
+        function(callback) {
+            setTimeout(function() {
+                callback(null, counter);
+            }, 1000);
+        },
+        function(err, n) {
+            if (err) {
+                console.log(new Date() + ': Async Task Error : ' + err);
+            }
+            return done(null, {
+                items: dataSummary,
+                user: userEmail
+            }, console.log(new Date() + ': summary data ready!'));
+        }
+    );
 });
 
-function getMoveTicksData(up, movesXID, first) {
-    var ticksHeaders = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'moves_xid', 'distance', 'time_completed', 'active_time',
-        'calories', 'steps', 'time', 'speed'
-    ];
-    fs.writeFile(dataDir + 'move_ticks.csv', ticksHeaders, function(err) {
-        if (err) console.log("Error writing moves data to csv file");
-    });
-    if (first) {
-        appendNewLine(dataDir + 'move_ticks.csv')
-    }
-
-    up.moves.ticks({
-        xid: movesXID
-    }, function(error, moveBody) {
-        if (error) {
-            console.log('Error receiving Jawbone UP moves data');
-        } else {
-            var ticksInfo = JSON.parse(moveBody).data.items;
-            var ticksAccessTime = JSON.parse(moveBody).meta['time'];
-            var userXID = JSON.parse(moveBody).meta['user_xid'];
-            if (ticksInfo) {
-                for (var j = 0; j < ticksInfo.length; j++) {
-                    ticksInfo[j]['user_xid'] = userXID;
-                    ticksInfo[j]['time_accessed'] = ticksAccessTime;
-                    ticksInfo[j]['moves_xid'] = movesXID;
-                    ticksInfo[j]['user_email'] = userEmail;
-                    ticksInfo[j]['ema_id'] = emaID;
-                }
-                jsonToCsv.json2csv(ticksInfo, function(err, csv) {
-                    if (err) console.log(err);
-                    fs.appendFile(dataDir + 'move_ticks.csv', csv, function(err) {
-                        if (err) console.log("Error appending moves data to csv file");
-                    });
-                }, {
-                    KEYS: ticksHeaders,
-                    PREPEND_HEADER: false
-                });
-            }
+function parseData(headers, file, err, body, getTicks) {
+    if (err) {
+        console.log(new Date() + ': Error Receiving Jawbone UP Data: ' + err);
+    } else {
+        var dataItems = JSON.parse(body).data.items;
+        if (dataItems) {
+            appendExtraItems(dataItems, body, getTicks, file);
+            convertAndFlush(dataItems, headers, file, true);
         }
-    });
+    }
 }
 
-function getSleepTicksData(up, sleepsXID, first) {
-    var sleepTicksHeader = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'sleeps_xid', 'depth', 'time'];
-    fs.writeFile(dataDir + 'sleep_ticks.csv', sleepTicksHeader, function(err) {
-        if (err) console.log("Error writing sleeps data to csv file");
-    });
-    if (first) {
-        appendNewLine(dataDir + 'sleep_ticks.csv')
+function appendExtraItems(dataItems, body, getTicks, filename) {
+    for (var k = 0; k < dataItems.length; k++) {
+        dataItems[k]['user_xid'] = JSON.parse(body).meta['user_xid'];
+        dataItems[k]['time_accessed'] = JSON.parse(body).meta['time'];
+        dataItems[k]['user_email'] = userEmail;
+        dataItems[k]['ema_id'] = emaID;
+        dataItems[k]['title'] = dataItems[k]['title'].replace(',', '');
+        if (getTicks) {
+            if (filename === 'moves.csv') {
+                moveIdentifiers.push(dataItems[k]['xid']);
+            } else if (filename === 'sleep.csv') {
+                sleepIdentifiers.push(dataItems[k]['xid']);
+            }
+        }
     }
+    getActivityTicks(filename);
+}
 
-    up.sleeps.ticks({
-        xid: sleepsXID
-    }, function(err, body) {
+function convertAndFlush(dataArray, headers, file, summary) {
+    jsonToCsv.json2csv(dataArray, function(err, csv) {
         if (err) {
-            console.log('Error receiving Jawbone Up sleep ticks');
+            console.log(new Date() + ': Error converting json to csv: ' + err)
         } else {
-            var ticksInfo = JSON.parse(body).data.items;
-            var ticksAccessTime = JSON.parse(body).meta['time'];
-            var userXID = JSON.parse(body).meta['user_xid'];
-            if (ticksInfo) {
-                for (var j = 0; j < ticksInfo.length; j++) {
-                    ticksInfo[j]['user_xid'] = userXID;
-                    ticksInfo[j]['time_accessed'] = ticksAccessTime;
-                    ticksInfo[j]['sleeps_xid'] = sleepsXID;
-                    ticksInfo[j]['user_email'] = userEmail;
-                    ticksInfo[j]['ema_id'] = emaID;
+            fs.writeFile(dataDir + file, csv, function(err) {
+                if (err) {
+                    console.log(new Date() + ': Error writing data to file: ' + err);
+                } else {
+                    if (summary) {
+                        createSummaryObjects(dataArray);
+                    }
                 }
-                jsonToCsv.json2csv(ticksInfo, function(err, csv) {
-                    if (err) console.log(err);
-                    fs.appendFile(dataDir + 'sleep_ticks.csv', csv, function(err) {
-                        if (err) console.log("Error appending sleeps data to csv file");
-                    });
-                }, {
-                    KEYS: sleepTicksHeader,
-                    PREPEND_HEADER: false
-                });
-            }
+            });
         }
+    }, {
+        KEYS: headers
     });
 }
 
-function createSummaryObjects(jsonArray, dataSummaryReadyCallback) {
+function getActivityTicks(filename) {
+    if (filename === 'moves.csv') {
+        for (var k = 0; k < moveIdentifiers.length; k++) {
+            up.moves.ticks({
+                xid: moveIdentifiers[k]
+            }, function(error, body) {
+                moveCounter++;
+                parseTicksData(error, body, MOVE_TICKS_HEADERS, 'move_ticks.csv', moveCounter);
+            });
+        }
+    } else if (filename === 'sleep.csv') {
+        for (var k = 0; k < sleepIdentifiers.length; k++) {
+            up.sleeps.ticks({
+                xid: sleepIdentifiers[k]
+            }, function(error, body) {
+                sleepCounter++;
+                parseTicksData(error, body, SLEEP_TICKS_HEADERS, 'sleep_ticks.csv', sleepCounter);
+            });
+        }
+    }
+}
+
+function parseTicksData(err, body, headers, filename, index) {
+    if (err) {
+        console.log(new Date() + ': Error Receiving Jawbone UP Data: ' + err);
+    } else {
+        var dataItems = JSON.parse(body).data.items;
+        if (dataItems) {
+            for (var j = 0; j < dataItems.length; j++) {
+                dataItems[j]['user_xid'] = JSON.parse(body).meta['user_xid'];
+                dataItems[j]['time_accessed'] = JSON.parse(body).meta['time'];
+                dataItems[j]['user_email'] = userEmail;
+                dataItems[j]['ema_id'] = emaID;
+                if (filename === 'sleep_ticks.csv') {
+                    sleepTicksData.push(dataItems[j]);
+                } else if (filename === 'move_ticks.csv') {
+                    moveTicksData.push(dataItems[j]);
+                }
+            }
+            if (filename === 'sleep_ticks.csv' && index == sleepIdentifiers.length) {
+                convertAndFlush(sleepTicksData, headers, filename, false);
+            } else if (filename === 'move_ticks.csv' && index == moveIdentifiers.length) {
+                convertAndFlush(moveTicksData, headers, filename, false);
+            }
+        }
+    }
+}
+
+function createSummaryObjects(jsonArray) {
     jsonArray.forEach(function(entry) {
         var dailyDataJsonArray = dataSummary.filter(function(value) {
             return value.date == entry.date;
@@ -304,11 +256,12 @@ function createSummaryObjects(jsonArray, dataSummaryReadyCallback) {
     });
 
     counter++;
-    if (counter == 3) { //Data summary is from three sources (hearrates, moves, and sleeps)
+    // Data summary is from three sources (hearrates, moves, and sleeps)
+    if (counter == 3) {
         dataSummary.sort(compare);
-        writeSummarySheet();
+        convertAndFlush(dataSummary, SUMMARY_HEADERS, 'summary.csv', false);
+        counter = 4;
     }
-    typeof dataSummaryReadyCallback === 'function' && dataSummaryReadyCallback();
 }
 
 function formatSeconds(durationInSeconds) {
@@ -318,15 +271,6 @@ function formatSeconds(durationInSeconds) {
     return hours + "h " + minutes + "m";
 }
 
-function writeSummarySheet() {
-    jsonToCsv.json2csv(dataSummary, function(err, csv) {
-        if (err) console.log("Error converting summary json data to csv");
-        fs.writeFile(dataDir + 'summary.csv', csv, function(err) {
-            if (err) console.log("Error writing summary data to csv file");
-        });
-    });
-}
-
 function compare(objA, objB) {
     if (objA.date < objB.date)
         return -1;
@@ -334,10 +278,4 @@ function compare(objA, objB) {
         return 1;
     else
         return 0;
-}
-
-function appendNewLine(filename) {
-    fs.appendFile(filename, '\n', function(err) {
-        if (err) console.log("Error appending new line to csv file");
-    });
 }
