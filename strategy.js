@@ -11,14 +11,12 @@ var jawboneAuth = {
     tokenURL: 'https://jawbone.com/auth/oauth2/token',
     callbackURL: settings['callbackURL']
 };
-var startDate, endDate, userEmail, emaID, dataDir, up, counter;
+var startDate, endDate, userEmail, emaID, dataDir, up, summaryCounter, fileCounter, moveCounter, sleepCounter;
 var dataSummary = [],
     moveIdentifiers = [],
     sleepIdentifiers = [],
     moveTicksData = [],
     sleepTicksData = [];
-var moveCounter = 0,
-    sleepCounter = 0;
 const HR_HEADERS = ['user_xid', 'user_email', 'ema_id', 'time_accessed',
     'xid', 'title', 'place_lon', 'place_lat', 'place_acc', 'place_name',
     'time_created', 'time_updated', 'date', 'resting_heartrate', 'details.tz',
@@ -85,7 +83,10 @@ exports.jawboneStrategy = new JawboneStrategy(jawboneAuth, function(token, refre
         end_time: endDate,
         limit: 1000000
     };
-    counter = 0;
+    summaryCounter = 0;
+    fileCounter = 0;
+    moveCounter = 0;
+    sleepCounter = 0;
 
     up.heartrates.get(params, function(err, body) {
         parseData(HR_HEADERS, 'heartrates.csv', err, body, false);
@@ -105,11 +106,11 @@ exports.jawboneStrategy = new JawboneStrategy(jawboneAuth, function(token, refre
 
     asyncFun.whilst(
         function() {
-            return counter < 4;
+            return fileCounter < 7;
         },
         function(callback) {
             setTimeout(function() {
-                callback(null, counter);
+                callback(null, fileCounter);
             }, 1000);
         },
         function(err, n) {
@@ -166,6 +167,7 @@ function convertAndFlush(dataArray, headers, file, summary) {
                     if (summary) {
                         createSummaryObjects(dataArray);
                     }
+                    fileCounter++;
                 }
             });
         }
@@ -255,12 +257,10 @@ function createSummaryObjects(jsonArray) {
         }
     });
 
-    counter++;
-    // Data summary is from three sources (hearrates, moves, and sleeps)
-    if (counter == 3) {
+    summaryCounter++;
+    if (summaryCounter == 3) {
         dataSummary.sort(compare);
         convertAndFlush(dataSummary, SUMMARY_HEADERS, 'summary.csv', false);
-        counter = 4;
     }
 }
 
