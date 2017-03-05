@@ -156,7 +156,7 @@ app.get('/home', function (req, res) {
     startDate = new Date(req.query['startDate']);
     originalStartDate = new Date(JSON.parse(JSON.stringify(startDate)));
     START_DATE = startDate.getTime()/1000;
-    END_DATE = new Date(startDate.setTime(startDate.getTime() + 8 * 86400000)).getTime()/1000;
+    END_DATE = new Date(startDate.setTime(startDate.getTime() + 15 * 86400000)).getTime()/1000;
     res.render('home');
     generateCombinedSummaryFiles();
 });
@@ -512,8 +512,10 @@ function generateCombinedSummaryFiles() {
 }
 
 function generateCombinedSummaryHeaders() {
-    WIDE_SUMMARY_HEADERS = ['study_id', 'jawbone_email', 'gender', 'gender_label', 'height', 'weight', 'study_start_date',
+    WIDE_SUMMARY_HEADERS =
+        ['study_id', 'jawbone_email', 'gender', 'gender_label', 'height', 'weight', 'study_start_date',
         'day_0', 'day_1', 'day_2', 'day_3', 'day_4', 'day_5', 'day_6', 'day_7',
+        'day_8', 'day_9', 'day_10', 'day_11', 'day_12', 'day_13', 'day_14',
         'resting_heartrate_day_0', 'sleep_duration_day_0', 'step_count_day_0',
         'resting_heartrate_day_1', 'sleep_duration_day_1', 'step_count_day_1',
         'resting_heartrate_day_2', 'sleep_duration_day_2', 'step_count_day_2',
@@ -521,7 +523,14 @@ function generateCombinedSummaryHeaders() {
         'resting_heartrate_day_4', 'sleep_duration_day_4', 'step_count_day_4',
         'resting_heartrate_day_5', 'sleep_duration_day_5', 'step_count_day_5',
         'resting_heartrate_day_6', 'sleep_duration_day_6', 'step_count_day_6',
-        'resting_heartrate_day_7', 'sleep_duration_day_7', 'step_count_day_7'];
+        'resting_heartrate_day_7', 'sleep_duration_day_7', 'step_count_day_7',
+        'resting_heartrate_day_8', 'sleep_duration_day_8', 'step_count_day_8',
+        'resting_heartrate_day_9', 'sleep_duration_day_9', 'step_count_day_9',
+        'resting_heartrate_day_10', 'sleep_duration_day_10', 'step_count_day_10',
+        'resting_heartrate_day_11', 'sleep_duration_day_11', 'step_count_day_11',
+        'resting_heartrate_day_12', 'sleep_duration_day_12', 'step_count_day_12',
+        'resting_heartrate_day_13', 'sleep_duration_day_13', 'step_count_day_13',
+        'resting_heartrate_day_14', 'sleep_duration_day_14', 'step_count_day_14'];
     writeHeaders(wideSummaryFile, WIDE_SUMMARY_HEADERS);
     LONG_SUMMARY_HEADERS = ['study_id', 'jawbone_email', 'gender', 'gender_label', 'height', 'weight', 'study_start_date',
     'day', 'resting_heartrate', 'sleep_duration', 'step_count'];
