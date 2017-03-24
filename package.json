@@ -20,7 +20,7 @@
     "json-2-csv": "^2.0.0",
     "js-yaml": "3.5.5 ",
     "async": "2.0.0-rc.2",
-    "selenium-webdriver": "2.53.2",
+    "selenium-webdriver": "3.3.0",
     "line-reader": "0.4.0",
     "mkdirp": "0.5.1"
   }

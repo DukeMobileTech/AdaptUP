@@ -1,4 +1,4 @@
-var express = require('express'),
+let express = require('express'),
     app = express(),
     ejs = require('ejs'),
     https = require('https'),
@@ -30,8 +30,9 @@ var express = require('express'),
     downloadDone = false,
     user, numSleepTicks, numMoveTicks, reason,
     startDate, originalStartDate, wideSummaryFile, longSummaryFile, shortSummaryFile, timeBasedFilename,
-    DATA_DIR, BASE_DATA_DIR, START_DATE, END_DATE, WIDE_SUMMARY_HEADERS, LONG_SUMMARY_HEADERS, SHORT_SUMMARY_HEADERS,
-    WAIT_TIME = 60000, MAX_RESULTS = 1000000, counter = 0, userCount = 0, moveCount = 0, sleepCount = 0,
+    DATA_DIR, BASE_DATA_DIR, START_DATE, END_DATE, wideSummaryHeaders = [], longSummaryHeaders = [],
+    shortSummaryHeaders,
+    WAIT_TIME = 120000, MAX_RESULTS = 1000000, counter = 0, userCount = 0, moveCount = 0, sleepCount = 0, duration = 7,
     LINUX_BASE_DIR = settings['LINUX_BASE_DIR'],
     WINDOWS_BASE_DIR = settings['WINDOWS_BASE_DIR'];
 
@@ -43,10 +44,10 @@ app.set('views', __dirname + '/views');
 
 app.use(passport.initialize());
 
-var browser = new webdriver.Builder().usingServer().withCapabilities({'browserName': 'chrome' }).build();
+let browser = new webdriver.Builder().usingServer().withCapabilities({'browserName': 'chrome'}).build();
 
-var lineReader = require('line-reader');
-lineReader.eachLine('config/subjects.csv', function(line, last) {
+let lineReader = require('line-reader');
+lineReader.eachLine('config/subjects.csv', function (line, last) {
     userDetails.push(line);
     if (last) {
         downloadUserData(userDetails[0]);
@@ -54,60 +55,51 @@ lineReader.eachLine('config/subjects.csv', function(line, last) {
     }
 });
 
-var User = require('./user.js');
+let User = require('./user.js');
 
 function downloadUserData(userString) {
-    var userInfo = userString.split(',');
-    if (userInfo[4].indexOf('/') == -1 && userInfo[4].lastIndexOf('/') == -1) {
+    let userInfo = userString.split(',');
+    if (userInfo[4].indexOf('/') === -1 && userInfo[4].lastIndexOf('/') === -1) {
         reason = userInfo[4];
     } else {
         reason = null;
     }
     console.log('start user download for user # ' + userCount + ' with ID ' + userInfo[0]);
     browser.get('https://localhost:5000/');
-    browser.wait(function () {
-        return browser.isElementPresent(webdriver.By.name('emaId'));
-    }, WAIT_TIME);
     // First page
-    var idElement = browser.findElement(webdriver.By.id('emaId'));
-    if (idElement) {
-        idElement.clear();
-        idElement.sendKeys(userInfo[0]);
-    }
-    var emailElement = browser.findElement(webdriver.By.id('email'));
-    if (emailElement) {
-        emailElement.clear();
-        emailElement.sendKeys(userInfo[1]);
-    }
-    var startDateElement = browser.findElement(webdriver.By.id('startDate'));
-    if (startDateElement) {
-        startDateElement.clear();
-        startDateElement.sendKeys(userInfo[2]);
-    }
-    var submitElement = browser.findElement(webdriver.By.id('submit'));
-    if (submitElement) { submitElement.click(); }
+    let idElement = browser.wait(webdriver.until.elementLocated(webdriver.By.id('emaId')), WAIT_TIME);
+    idElement.clear();
+    idElement.sendKeys(userInfo[0]);
+    let emailElement = browser.wait(webdriver.until.elementLocated(webdriver.By.id('email')), WAIT_TIME);
+    emailElement.clear();
+    emailElement.sendKeys(userInfo[1]);
+    let startDateElement = browser.wait(webdriver.until.elementLocated(webdriver.By.id('startDate')), WAIT_TIME);
+    startDateElement.clear();
+    startDateElement.sendKeys(userInfo[2]);
+    let submitElement = browser.wait(webdriver.until.elementLocated(webdriver.By.id('submit')), WAIT_TIME);
+    submitElement.click();
     // Second page
-    var loginElement = browser.findElement(webdriver.By.id('login'));
-    if (loginElement) { loginElement.click(); }
+    let loginElement = browser.wait(webdriver.until.elementLocated(webdriver.By.id('login')), WAIT_TIME);
+    loginElement.click();
     // Third page
-    var jawboneEmailElement = browser.findElement(webdriver.By.id('jawbone-signin-email'));
-    if (jawboneEmailElement) { jawboneEmailElement.sendKeys(userInfo[1]); }
-    var jawbonePasswordElement = browser.findElement(webdriver.By.id('jawbone-signin-password'));
-    if (jawbonePasswordElement) { jawbonePasswordElement.sendKeys(userInfo[3]); }
-    var signInElement = browser.findElement(webdriver.By.xpath("//button[@type='submit'][@class='form-button']"));
-    if (signInElement) { signInElement.click(); }
+    let jawboneEmailElement = browser.wait(webdriver.until.elementLocated(webdriver.By.id('jawbone-signin-email')), WAIT_TIME);
+    jawboneEmailElement.sendKeys(userInfo[1]);
+    let jawbonePasswordElement = browser.wait(webdriver.until.elementLocated(webdriver.By.id('jawbone-signin-password')), WAIT_TIME);
+    jawbonePasswordElement.sendKeys(userInfo[3]);
+    let signInElement = browser.wait(webdriver.until.elementLocated(webdriver.By.xpath("//button[@type='submit'][@class='form-button']")), WAIT_TIME);
+    signInElement.click();
     // Fourth page
-    var agreeElement = browser.findElement(webdriver.By.xpath("//button[@type='submit'][@class='form-button']"));
-    if (agreeElement) { agreeElement.click(); }
+    let agreeElement = browser.wait(webdriver.until.elementLocated(webdriver.By.xpath("//button[@type='submit'][@class='form-button']")), WAIT_TIME);
+    agreeElement.click();
     // Last page
     clickOnLogoutButton();
 }
 
 function clickOnLogoutButton() {
-    setTimeout(function() {
-        if (downloadDone && moveCount == numMoveTicks && sleepCount == numSleepTicks) {
-            var logoutElement = browser.findElement(webdriver.By.id('adaptup-logout'));
-            if (logoutElement) { logoutElement.click(); }
+    setTimeout(function () {
+        if (downloadDone && moveCount === numMoveTicks && sleepCount === numSleepTicks) {
+            let logoutElement = browser.wait(webdriver.until.elementLocated(webdriver.By.id('adaptup-logout')), WAIT_TIME);
+            logoutElement.click();
             downloadDone = false;
             console.log('user download done for: ' + userCount);
             userCount++;
@@ -155,8 +147,8 @@ app.get('/home', function (req, res) {
     user.setReason(reason);
     startDate = new Date(req.query['startDate']);
     originalStartDate = new Date(JSON.parse(JSON.stringify(startDate)));
-    START_DATE = startDate.getTime()/1000;
-    END_DATE = new Date(startDate.setTime(startDate.getTime() + 15 * 86400000)).getTime()/1000;
+    START_DATE = startDate.getTime() / 1000;
+    END_DATE = new Date(startDate.setTime(startDate.getTime() + 8 * 86400000)).getTime() / 1000;
     res.render('home');
     generateCombinedSummaryFiles();
 });
@@ -173,7 +165,7 @@ passport.use('jawbone', new JawboneStrategy({
     callbackURL: jawboneAuth.callbackURL
 }, function (token, refreshToken, profile, done) {
     setUpDataDirectory();
-    var options = {
+    let options = {
             access_token: token,
             client_id: jawboneAuth.clientID,
             client_secret: jawboneAuth.clientSecret
@@ -182,7 +174,7 @@ passport.use('jawbone', new JawboneStrategy({
 
     up.me.get({}, function (err, body) {
         if (err) throw err;
-        var userData = JSON.parse(body).data;
+        let userData = JSON.parse(body).data;
         user.setHeight(userData.height);
         user.setWeight(userData.weight);
         user.setGender(userData.gender ? 1 : 0); // false == 0 == male and true == 1 == female
@@ -193,11 +185,11 @@ passport.use('jawbone', new JawboneStrategy({
         if (err) {
             console.log('Error receiving Jawbone UP data');
         } else {
-            var heartRateHeaders = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'xid', 'title', 'date',
+            let heartRateHeaders = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'xid', 'title', 'date',
                 'place_lon', 'place_lat', 'place_acc', 'place_name', 'time_created', 'time_updated',
                 'resting_heartrate', 'details.tz', 'details.sunrise', 'details.sunset'];
-            var heartRates = JSON.parse(body).data.items;
-            for (var k = 0; k < heartRates.length; k++) {
+            let heartRates = JSON.parse(body).data.items;
+            for (let k = 0; k < heartRates.length; k++) {
                 heartRates[k]['user_xid'] = JSON.parse(body).meta['user_xid'];
                 heartRates[k]['time_accessed'] = JSON.parse(body).meta['time'];
                 heartRates[k]['user_email'] = user.email;
@@ -217,13 +209,13 @@ passport.use('jawbone', new JawboneStrategy({
         if (err) {
             console.log('Error receiving Jawbone UP data');
         } else {
-            var headers = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'xid', 'title', 'date', 'type',
+            let headers = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'xid', 'title', 'date', 'type',
                 'sub_type', 'place_lon', 'place_lat', 'place_acc', 'place_name', 'time_created', 'time_updated',
                 'time_completed', 'details.steps', 'details.time', 'details.tz', 'details.bg_active_time',
                 'details.calories', 'details.bmr_calories', 'details.bmr', 'details.bg_calories', 'details.meters',
                 'details.km', 'details.intensity'];
-            var jawboneData = JSON.parse(body).data.items;
-            for (var k = 0; k < jawboneData.length; k++) {
+            let jawboneData = JSON.parse(body).data.items;
+            for (let k = 0; k < jawboneData.length; k++) {
                 jawboneData[k]['user_xid'] = JSON.parse(body).meta['user_xid'];
                 jawboneData[k]['time_accessed'] = JSON.parse(body).meta['time'];
                 jawboneData[k]['user_email'] = user.email;
@@ -242,22 +234,22 @@ passport.use('jawbone', new JawboneStrategy({
         if (err) {
             console.log('Error receiving Jawbone UP data');
         } else {
-            var movesHeaders = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'xid', 'title', 'date', 'type',
+            let movesHeaders = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'xid', 'title', 'date', 'type',
                 'time_created', 'time_updated', 'time_completed', 'details.distance', 'details.km', 'details.steps',
                 'details.active_time', 'details.longest_active', 'details.inactive_time', 'details.longest_idle',
                 'details.calories', 'details.bmr_day', 'details.bmr', 'details.bg_calories', 'details.wo_calories',
                 'details.wo_time', 'details.wo_active_time', 'details.wo_count', 'details.wo_longest',
                 'details.sunrise', 'details.sunset', 'details.tz', 'details.steps_3am'];
 
-            var movesInfo = JSON.parse(body).data.items;
+            let movesInfo = JSON.parse(body).data.items;
             numMoveTicks = movesInfo.length;
-            for (var k = 0; k < movesInfo.length; k++) {
+            for (let k = 0; k < movesInfo.length; k++) {
                 movesInfo[k]['user_xid'] = JSON.parse(body).meta['user_xid'];
                 movesInfo[k]['user_email'] = user.email;
                 movesInfo[k]['ema_id'] = user.studyId;
                 movesInfo[k]['time_accessed'] = JSON.parse(body).meta['time'];
                 movesInfo[k]['title'] = movesInfo[k]['title'].replace(',', '');
-                getMoveTicksData(up, movesInfo[k]['xid'], k == 0);
+                getMoveTicksData(up, movesInfo[k]['xid'], k === 0);
             }
 
             converter.json2csv(movesInfo, function (err, csv) {
@@ -274,29 +266,31 @@ passport.use('jawbone', new JawboneStrategy({
         if (err) {
             console.log('Error receiving Jawbone UP data');
         } else {
-            var sleepHeader = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'xid', 'title', 'date', 'sub_type',
+            let sleepHeader = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'xid', 'title', 'date', 'sub_type',
                 'time_created', 'time_completed', 'place_lat', 'place_lon', 'place_acc', 'place_name', 'details.body',
                 'details.mind', 'details.smart_alarm_fire', 'details.awake_time', 'details.asleep_time',
                 'details.awakenings', 'details.rem', 'details.light', 'details.sound', 'details.awake',
                 'details.duration', 'details.quality', 'details.tz', 'details.sunset', 'details.sunrise'];
 
-            var sleepInfo = JSON.parse(body).data.items;
+            let sleepInfo = JSON.parse(body).data.items;
             numSleepTicks = sleepInfo.length;
-            for (var k = 0; k < sleepInfo.length; k++) {
+            for (let k = 0; k < sleepInfo.length; k++) {
                 sleepInfo[k]['user_xid'] = JSON.parse(body).meta['user_xid'];
                 sleepInfo[k]['time_accessed'] = JSON.parse(body).meta['time'];
                 sleepInfo[k]['user_email'] = user.email;
                 sleepInfo[k]['ema_id'] = user.studyId;
-                getSleepTicksData(up, sleepInfo[k]['xid'], k == 0);
+                getSleepTicksData(up, sleepInfo[k]['xid'], k === 0);
             }
 
             converter.json2csv(sleepInfo, function (err, csv) {
                 if (err) throw err;
                 fs.writeFile(DATA_DIR + 'sleep.csv', csv, function (err) {
                     if (err) throw err;
-                    createSummaryObjects(sleepInfo, function() {
+                    createSummaryObjects(sleepInfo, function () {
                         async.whilst(
-                            function () { return counter < 3; },
+                            function () {
+                                return counter < 3;
+                            },
                             function (callback) {
                                 setTimeout(function () {
                                     callback(null, counter);
@@ -305,7 +299,7 @@ passport.use('jawbone', new JawboneStrategy({
                             function (err, n) {
                                 if (err) throw err;
                                 downloadDone = true;
-                                return done(null, { items: dataSummary, user: user.email }, console.log('Data ready!'));
+                                return done(null, {items: dataSummary, user: user.email}, console.log('Data ready!'));
                             }
                         );
                     });
@@ -316,44 +310,59 @@ passport.use('jawbone', new JawboneStrategy({
 }));
 
 function formatDate(endDate) {
-    var month = endDate.getMonth().toString();
-    var date = endDate.getDate().toString();
-    if (month.length == 1) { month = '0' + month; }
-    if (date.length == 1) { date = '0' + date; }
-   return parseInt(endDate.getFullYear().toString() + month + date);
+    let month = endDate.getMonth().toString();
+    let date = endDate.getDate().toString();
+    if (month.length === 1) {
+        month = '0' + month;
+    }
+    if (date.length === 1) {
+        date = '0' + date;
+    }
+    return parseInt(endDate.getFullYear().toString() + month + date);
 }
 
 function createSummaryObjects(jsonArray, dataSummaryReadyCallback) {
-    if (dataSummary == null) { dataSummary = []; }
+    if (dataSummary === null) {
+        dataSummary = [];
+    }
     jsonArray.forEach(function (entry) {
-        var dailyDataJsonArray = dataSummary.filter(function(value) {
-            return value.date == entry.date;
+        let dailyDataJsonArray = dataSummary.filter(function (value) {
+            return value.date === entry.date;
         });
-
-        if (dailyDataJsonArray.length == 0) {
-            var dailyDataJsonObject = {};
+        let dailyDataJsonObject;
+        let newDailyDataJsonObject;
+        if (dailyDataJsonArray.length === 0) {
+            dailyDataJsonObject = {};
             dailyDataJsonObject.date = entry.date;
             dailyDataJsonObject.user_email = user.email;
             dailyDataJsonObject.ema_id = user.studyId;
             dailyDataJsonObject.resting_heartrate = '';
             dailyDataJsonObject.step_count = '';
             dailyDataJsonObject.sleep_duration = '';
-            var newDailyDataJsonObject = true;
+            newDailyDataJsonObject = true;
         } else {
             dailyDataJsonObject = dailyDataJsonArray[0];
             newDailyDataJsonObject = false;
         }
 
-        if (entry.resting_heartrate != null) { dailyDataJsonObject.resting_heartrate = entry.resting_heartrate; }
-        if (entry.details.steps != null) { dailyDataJsonObject.step_count = entry.details.steps; }
-        if (entry.details.duration != null) { dailyDataJsonObject.sleep_duration = formatSeconds(
-            entry.details.duration - entry.details.awake);}
+        if (entry.resting_heartrate) {
+            dailyDataJsonObject.resting_heartrate = entry.resting_heartrate;
+        }
+        if (entry.details.steps) {
+            dailyDataJsonObject.step_count = entry.details.steps;
+        }
+        if (entry.details.duration) {
+            dailyDataJsonObject.sleep_duration = formatSeconds(
+                entry.details.duration - entry.details.awake);
+        }
 
-        if (newDailyDataJsonObject) { dataSummary.push(dailyDataJsonObject); }
+        if (newDailyDataJsonObject) {
+            dataSummary.push(dailyDataJsonObject);
+        }
     });
 
     counter++;
-    if (counter == 3) { //Data summary is from three sources (hearrates, moves, and sleeps)
+    if (counter === 3) { //Data summary is from three sources (heartrates, moves, and sleeps)
         dataSummary.sort(compare);
         writeIndividualSummarySheet();
         sanitizeCombinedSummaryData(dataSummary);
@@ -362,7 +371,7 @@ function createSummaryObjects(jsonArray, dataSummaryReadyCallback) {
 }
 
 function getMoveTicksData(up, movesXID, first) {
-    var ticksHeaders = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'moves_xid', 'distance', 'time_completed',
+    let ticksHeaders = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'moves_xid', 'distance', 'time_completed',
         'active_time', 'calories', 'steps', 'time', 'speed'];
     fs.writeFile(DATA_DIR + 'move_ticks.csv', ticksHeaders, function (err) {
         if (err) throw err;
@@ -375,10 +384,10 @@ function getMoveTicksData(up, movesXID, first) {
         if (error) {
             console.log('Error receiving Jawbone UP moves data');
         } else {
-            var ticksInfo = JSON.parse(moveBody).data.items;
-            var ticksAccessTime = JSON.parse(moveBody).meta['time'];
-            var userXID = JSON.parse(moveBody).meta['user_xid'];
-            for (var j = 0; j < ticksInfo.length; j++) {
+            let ticksInfo = JSON.parse(moveBody).data.items;
+            let ticksAccessTime = JSON.parse(moveBody).meta['time'];
+            let userXID = JSON.parse(moveBody).meta['user_xid'];
+            for (let j = 0; j < ticksInfo.length; j++) {
                 ticksInfo[j]['user_xid'] = userXID;
                 ticksInfo[j]['time_accessed'] = ticksAccessTime;
                 ticksInfo[j]['moves_xid'] = movesXID;
@@ -397,7 +406,7 @@ function getMoveTicksData(up, movesXID, first) {
 }
 
 function getSleepTicksData(up, sleepsXID, first) {
-    var sleepTicksHeader = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'sleeps_xid', 'depth', 'time'];
+    let sleepTicksHeader = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'sleeps_xid', 'depth', 'time'];
     fs.writeFile(DATA_DIR + 'sleep_ticks.csv', sleepTicksHeader, function (err) {
         if (err) throw err;
     });
@@ -409,10 +418,10 @@ function getSleepTicksData(up, sleepsXID, first) {
         if (err) {
             console.log('Error receiving Jawbone Up sleep ticks');
         } else {
-            var ticksInfo = JSON.parse(body).data.items;
-            var ticksAccessTime = JSON.parse(body).meta['time'];
-            var userXID = JSON.parse(body).meta['user_xid'];
-            for (var j = 0; j < ticksInfo.length; j++) {
+            let ticksInfo = JSON.parse(body).data.items;
+            let ticksAccessTime = JSON.parse(body).meta['time'];
+            let userXID = JSON.parse(body).meta['user_xid'];
+            for (let j = 0; j < ticksInfo.length; j++) {
                 ticksInfo[j]['user_xid'] = userXID;
                 ticksInfo[j]['time_accessed'] = ticksAccessTime;
                 ticksInfo[j]['sleeps_xid'] = sleepsXID;
@@ -438,19 +447,21 @@ function appendNewLine(filename) {
 
 function setUpDataDirectory() {
     setBaseDataDirectory();
-    createDirectory(BASE_DATA_DIR + user.studyId + '/' + timeBasedFilename  + '/');
+    createDirectory(BASE_DATA_DIR + user.studyId + '/' + timeBasedFilename + '/');
 }
 
 function setBaseDataDirectory() {
     if (settings['WINDOWS'] && fs.existsSync(WINDOWS_BASE_DIR)) {
         BASE_DATA_DIR = WINDOWS_BASE_DIR;
-    } else if(fs.existsSync(LINUX_BASE_DIR)) {
+    } else if (fs.existsSync(LINUX_BASE_DIR)) {
         BASE_DATA_DIR = LINUX_BASE_DIR;
     } else {
         BASE_DATA_DIR = 'data/';
     }
-    if (timeBasedFilename == null) { timeBasedFilename = new Date().toString().replace(/\W/g, "_"); }
-    DATA_DIR = BASE_DATA_DIR + user.studyId + '/' + timeBasedFilename  + '/';
+    if (timeBasedFilename === null || timeBasedFilename === undefined) {
+        timeBasedFilename = new Date().toString().replace(/\W/g, "_");
+    }
+    DATA_DIR = BASE_DATA_DIR + user.studyId + '/' + timeBasedFilename + '/';
 }
 
 function createDirectory(directory) {
@@ -462,14 +473,14 @@ function createDirectory(directory) {
 }
 
 function formatSeconds(durationInSeconds) {
-    var hours = Math.floor(parseInt(durationInSeconds) / 3600);
+    let hours = Math.floor(parseInt(durationInSeconds) / 3600);
     durationInSeconds %= 3600;
-    var minutes = Math.floor(parseInt(durationInSeconds) / 60);
+    let minutes = Math.floor(parseInt(durationInSeconds) / 60);
     return hours + 'h ' + minutes + 'm';
 }
 
 function writeIndividualSummarySheet() {
-    var summaryHeader = ['date', 'user_email', 'ema_id', 'resting_heartrate', 'step_count', 'sleep_duration'];
+    let summaryHeader = ['date', 'user_email', 'ema_id', 'resting_heartrate', 'step_count', 'sleep_duration'];
     fs.writeFile(DATA_DIR + 'summary.csv', summaryHeader, function (err) {
         if (err) throw err;
         converter.json2csv(dataSummary, function (err, csv) {
@@ -477,7 +488,7 @@ function writeIndividualSummarySheet() {
             fs.writeFile(DATA_DIR + 'summary.csv', csv, function (err) {
                 if (err) throw err;
             });
-        }, { KEYS: summaryHeader, EMPTY_FIELD_VALUE: '' });
+        }, {KEYS: summaryHeader, EMPTY_FIELD_VALUE: ''});
     });
 }
 
@@ -500,10 +511,10 @@ function resetVariables() {
 }
 
 function generateCombinedSummaryFiles() {
-    if (userCount == 0) {
+    if (userCount === 0) {
         setBaseDataDirectory();
         createDirectory(BASE_DATA_DIR + 'summaries/');
-        var base = BASE_DATA_DIR + 'summaries/' + timeBasedFilename;
+        let base = BASE_DATA_DIR + 'summaries/' + timeBasedFilename;
         wideSummaryFile = base + 'wide.csv';
         longSummaryFile = base + 'long.csv';
         shortSummaryFile = base + 'short.csv';
@@ -512,31 +523,20 @@ function generateCombinedSummaryFiles() {
 }
 
 function generateCombinedSummaryHeaders() {
-    WIDE_SUMMARY_HEADERS =
-        ['study_id', 'jawbone_email', 'gender', 'gender_label', 'height', 'weight', 'study_start_date',
-        'day_0', 'day_1', 'day_2', 'day_3', 'day_4', 'day_5', 'day_6', 'day_7',
-        'day_8', 'day_9', 'day_10', 'day_11', 'day_12', 'day_13', 'day_14',
-        'resting_heartrate_day_0', 'sleep_duration_day_0', 'step_count_day_0',
-        'resting_heartrate_day_1', 'sleep_duration_day_1', 'step_count_day_1',
-        'resting_heartrate_day_2', 'sleep_duration_day_2', 'step_count_day_2',
-        'resting_heartrate_day_3', 'sleep_duration_day_3', 'step_count_day_3',
-        'resting_heartrate_day_4', 'sleep_duration_day_4', 'step_count_day_4',
-        'resting_heartrate_day_5', 'sleep_duration_day_5', 'step_count_day_5',
-        'resting_heartrate_day_6', 'sleep_duration_day_6', 'step_count_day_6',
-        'resting_heartrate_day_7', 'sleep_duration_day_7', 'step_count_day_7',
-        'resting_heartrate_day_8', 'sleep_duration_day_8', 'step_count_day_8',
-        'resting_heartrate_day_9', 'sleep_duration_day_9', 'step_count_day_9',
-        'resting_heartrate_day_10', 'sleep_duration_day_10', 'step_count_day_10',
-        'resting_heartrate_day_11', 'sleep_duration_day_11', 'step_count_day_11',
-        'resting_heartrate_day_12', 'sleep_duration_day_12', 'step_count_day_12',
-        'resting_heartrate_day_13', 'sleep_duration_day_13', 'step_count_day_13',
-        'resting_heartrate_day_14', 'sleep_duration_day_14', 'step_count_day_14'];
-    writeHeaders(wideSummaryFile, WIDE_SUMMARY_HEADERS);
-    LONG_SUMMARY_HEADERS = ['study_id', 'jawbone_email', 'gender', 'gender_label', 'height', 'weight', 'study_start_date',
-    'day', 'resting_heartrate', 'sleep_duration', 'step_count'];
-    writeHeaders(longSummaryFile, LONG_SUMMARY_HEADERS);
-    SHORT_SUMMARY_HEADERS = ['USERID', 'SUBJECTID', 'JAWBONEEMAIL', 'NUMSLEEPDAYS', 'NUMSTEPDAYS', 'STARTDATE', 'REASON'];
-    writeHeaders(shortSummaryFile, SHORT_SUMMARY_HEADERS);
+    let defaultHeaders = ['study_id', 'jawbone_email', 'gender', 'gender_label', 'height', 'weight', 'study_start_date'];
+    wideSummaryHeaders = wideSummaryHeaders.concat(defaultHeaders);
+    let dayHeaders = [], dailyDataHeaders = [];
+    for (let k = 0; k <= duration; k++) {
+        dayHeaders.push(`day_${k}`);
+        dailyDataHeaders = dailyDataHeaders.concat([`resting_heartrate_day_${k}`, `sleep_duration_day_${k}`, `step_count_day_${k}`]);
+    }
+    wideSummaryHeaders = wideSummaryHeaders.concat(dayHeaders).concat(dailyDataHeaders);
+    writeHeaders(wideSummaryFile, wideSummaryHeaders);
+    longSummaryHeaders = longSummaryHeaders.concat(defaultHeaders).concat(
+        ['day', 'resting_heartrate', 'sleep_duration', 'step_count']);
+    writeHeaders(longSummaryFile, longSummaryHeaders);
+    shortSummaryHeaders = ['USERID', 'SUBJECTID', 'JAWBONEEMAIL', 'NUMSLEEPDAYS', 'NUMSTEPDAYS', 'STARTDATE', 'REASON'];
+    writeHeaders(shortSummaryFile, shortSummaryHeaders);
 }
 
 function writeHeaders(filename, headers) {
@@ -547,20 +547,24 @@ function writeHeaders(filename, headers) {
 }
 
 function sanitizeCombinedSummaryData(summaryArray) {
-    var date;
+    let date;
     if (summaryArray.length < 8) {
-        for (var i = 0; i < 8; i++) {
-            var newStartDate = new Date(JSON.parse(JSON.stringify(originalStartDate)));
-            var dataDate = new Date(newStartDate.setTime(newStartDate.getTime() + i * 86400000)).toLocaleDateString().split("/");
-            var month = dataDate[0], day = dataDate[1];
-            if (month.length == 1) { month = '0' + month; }
-            if (day.length == 1) { day = '0' + day; }
+        for (let i = 0; i < 8; i++) {
+            let newStartDate = new Date(JSON.parse(JSON.stringify(originalStartDate)));
+            let dataDate = new Date(newStartDate.setTime(newStartDate.getTime() + i * 86400000)).toLocaleDateString().split("/");
+            let month = dataDate[0], day = dataDate[1];
+            if (month.length === 1) {
+                month = '0' + month;
+            }
+            if (day.length === 1) {
+                day = '0' + day;
+            }
             date = parseInt(dataDate[2] + month + day);
-            var dailyDataJsonArray = summaryArray.filter(function(value) {
-                return value.date == date;
+            let dailyDataJsonArray = summaryArray.filter(function (value) {
+                return value.date === date;
             });
-            if (dailyDataJsonArray.length == 0) {
-                var jsonObject = {};
+            if (dailyDataJsonArray.length === 0) {
+                let jsonObject = {};
                 jsonObject.date = date;
                 jsonObject.user_email = user.email;
                 jsonObject.ema_id = user.studyId;
@@ -582,7 +586,7 @@ function formatDateString(str) {
 }
 
 function generateDefaultRowData() {
-    var dataRow = {};
+    let dataRow = {};
     dataRow['study_id'] = user.studyId;
     dataRow['jawbone_email'] = user.email;
     dataRow['gender'] = user.gender;
@@ -603,46 +607,48 @@ function writeJsonToCsvFile(dataArray, filename, headers) {
 }
 
 function writeWideFormat(data) {
-    var dataRow = generateDefaultRowData();
-    for (var j = 0; j < data.length; j++) {
+    let dataRow = generateDefaultRowData();
+    for (let j = 0; j < data.length; j++) {
         dataRow['day_' + j] = formatDateString(data[j]['date'].toString());
         dataRow['resting_heartrate_day_' + j] = data[j]['resting_heartrate'];
         dataRow['sleep_duration_day_' + j] = data[j]['sleep_duration'];
         dataRow['step_count_day_' + j] = data[j]['step_count'];
     }
-    writeJsonToCsvFile([dataRow], wideSummaryFile, WIDE_SUMMARY_HEADERS);
+    writeJsonToCsvFile([dataRow], wideSummaryFile, wideSummaryHeaders);
 }
 
 function writeLongFormat(data) {
-    var userData = [];
-    for (var j = 0; j < data.length; j++) {
-        var dataRow = generateDefaultRowData();
+    let userData = [];
+    for (let j = 0; j < data.length; j++) {
+        let dataRow = generateDefaultRowData();
         dataRow['day'] = formatDateString(data[j]['date'].toString());
         dataRow['resting_heartrate'] = data[j]['resting_heartrate'];
         dataRow['sleep_duration'] = data[j]['sleep_duration'];
         dataRow['step_count'] = data[j]['step_count'];
         userData.push(dataRow);
     }
-    writeJsonToCsvFile(userData, longSummaryFile, LONG_SUMMARY_HEADERS);
+    writeJsonToCsvFile(userData, longSummaryFile, longSummaryHeaders);
 }
 
 function writeShortFormat(data) {
-    var sleepDays = data.filter(function(value) {
-        return (value.sleep_duration != null && value.sleep_duration != '');
+    let sleepDays = data.filter(function (value) {
+        return (value.sleep_duration !== null && value.sleep_duration !== '');
     });
-    var stepDays = data.filter(function(value) {
-        return (value.step_count != null && value.step_count != '' && value.step_count > 1);
+    let stepDays = data.filter(function (value) {
+        return (value.step_count !== null && value.step_count !== '' && value.step_count > 1);
     });
-    if (user.reason != null) {
+    if (user.reason !== null) {
         sleepDays = "-";
         stepDays = "-";
     } else {
         sleepDays = sleepDays.length;
         stepDays = stepDays.length;
     }
-    writeJsonToCsvFile([{'USERID': user.userId, 'SUBJECTID': user.studyId, 'JAWBONEEMAIL': user.email,
-            'NUMSLEEPDAYS': sleepDays, 'NUMSTEPDAYS': stepDays, 'STARTDATE': originalStartDate.toLocaleDateString(),
-            'REASON': user.reason}], shortSummaryFile, SHORT_SUMMARY_HEADERS);
+    writeJsonToCsvFile([{
+        'USERID': user.userId, 'SUBJECTID': user.studyId, 'JAWBONEEMAIL': user.email,
+        'NUMSLEEPDAYS': sleepDays, 'NUMSTEPDAYS': stepDays, 'STARTDATE': originalStartDate.toLocaleDateString(),
+        'REASON': user.reason
+    }], shortSummaryFile, shortSummaryHeaders);
 }
 
 https.createServer(sslOptions, app).listen(port, function () {
