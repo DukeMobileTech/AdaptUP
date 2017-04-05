@@ -1,13 +1,4 @@
-var express = require('express')
-var app = express()
-var fs = require('fs')
-var path = require('path')
-var winston = require('winston')
-var expressWinston = require('express-winston')
-var bodyParser = require('body-parser')
-var passport = require('passport')
-var yaml = require('js-yaml')
-var routes = require('./routes')
+let express = require('express'), app = express(), fs = require('fs'), path = require('path'), winston = require('winston'),expressWinston = require('express-winston'), bodyParser = require('body-parser'), passport = require('passport'), yaml = require('js-yaml'), routes = require('./routes')
 const PORT = 5000
 
 expressWinston.requestWhitelist = ['url', 'method', 'originalUrl', 'query']
@@ -49,14 +40,14 @@ app.get('/', function (req, res) {
 passport.use('jawbone', routes.strategy.jawboneStrategy)
 
 if (app.settings.env === 'production') {
-  var http = require('http')
+  let http = require('http')
   http.createServer(app).listen(PORT, function () {
     console.log('AdaptUP ' + app.settings.env + ' server listening on ' + PORT)
   })
 } else {
-  var https = require('https')
-  var settings = yaml.safeLoad(fs.readFileSync('config/settings.yml', 'utf8'))
-  var sslOptions = {
+  let https = require('https')
+  let settings = yaml.safeLoad(fs.readFileSync('config/settings.yml', 'utf8'))
+  let sslOptions = {
     key: fs.readFileSync(settings['serverKey']),
     cert: fs.readFileSync(settings['serverCert'])
   }

@@ -1,20 +1,16 @@
-var express = require('express')
-var passport = require('passport')
-var fs = require('fs')
-var archiver = require('archiver')
-var path = require('path')
-var mime = require('mime')
-var yaml = require('js-yaml')
-var settings = yaml.safeLoad(fs.readFileSync('config/settings.yml', 'utf8'))
-var scopes = ['basic_read', 'extended_read', 'location_read',
-  'mood_read', 'sleep_read', 'move_read', 'meal_read', 'weight_read',
-  'generic_event_read', 'heartrate_read'
-]
-var dataDir, emaID
+let express = require('express')
+let passport = require('passport')
+let fs = require('fs')
+let path = require('path')
+let mime = require('mime')
+let yaml = require('js-yaml')
+let settings = yaml.safeLoad(fs.readFileSync('config/settings.yml', 'utf8'))
+let scopes = ['basic_read', 'extended_read', 'location_read', 'mood_read', 'sleep_read', 'move_read', 'meal_read', 'weight_read', 'generic_event_read', 'heartrate_read']
+let dataDir, emaID
 const BASE_DIR = settings['BASE_DIR']
 
-var strategy = require('./strategy')
-var router = express.Router()
+let strategy = require('./strategy')
+let router = express.Router()
 router.use(express.static(path.join(__dirname, '/public')))
 
 router.get('/login/jawbone',
@@ -36,6 +32,7 @@ router.get('/summary',
 
 router.get('/logout', function (req, res) {
   deleteDataFolder()
+  strategy.resetVariables()
   req.logout()
   res.redirect('/adaptup')
 })
@@ -54,8 +51,8 @@ router.get('/download', function (req, res) {
 })
 
 function zipDir (res) {
-  var zipfile = fs.createWriteStream('data/' + emaID + '.zip')
-  var archive = archiver('zip', {
+  let zipfile = fs.createWriteStream('data/' + emaID + '.zip')
+  let archive = archiver('zip', {
     store: true
   })
   zipfile.on('close', function () {
@@ -79,8 +76,8 @@ function setUpParamaters (req) {
   strategy.setUserEmail(req.query['email'])
   setUpDataDirectory()
 
-  var today = new Date()
-  var startDate = req.query['startDate']
+  let today = new Date()
+  let startDate = req.query['startDate']
   if (startDate) {
     startDate = new Date(startDate)
   } else {
@@ -88,7 +85,7 @@ function setUpParamaters (req) {
   }
   strategy.setStartDate(startDate.getTime() / 1000)
 
-  var endDate = req.query['endDate']
+  let endDate = req.query['endDate']
   if (endDate) {
     endDate = new Date(endDate).getTime() / 1000
   } else {
@@ -98,12 +95,12 @@ function setUpParamaters (req) {
 }
 
 function downloadFile (res) {
-  var file = 'data/' + emaID + '.zip'
+  let file = 'data/' + emaID + '.zip'
   res.setHeader('Content-disposition', 'attachment; filename=' + path.basename(file))
   res.setHeader('Content-type', mime.lookup(file))
-  var filestream = fs.createReadStream(file)
-  filestream.pipe(res)
-  filestream.on('close', function () {
+  let fileStream = fs.createReadStream(file)
+  fileStream.pipe(res)
+  fileStream.on('close', function () {
     deleteFile(file)
   })
 }
