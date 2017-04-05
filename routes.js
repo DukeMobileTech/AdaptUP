@@ -14,7 +14,7 @@ app.get('/login/jawbone',
   })
 )
 
-app.get('/sleepdata',
+app.get('/summary',
   passport.authorize('jawbone', {
     scope: SCOPES,
     failureRedirect: '/'
