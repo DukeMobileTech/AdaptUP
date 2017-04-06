@@ -12,19 +12,22 @@ let jawboneAuth = {
   tokenURL: 'https://jawbone.com/auth/oauth2/token',
   callbackURL: settings['callbackURL']
 }
-let startDate, endDate, userEmail, emaID, dataDir, up, summaryCounter, fileCounter, moveCounter, sleepCounter, timeBasedFilename, wideSummaryFile, longSummaryFile, shortSummaryFile, baseDataDir, originalStartDate
-let dataSummary = [], moveIdentifiers = [], sleepIdentifiers = [], moveTicksData = [], sleepTicksData = [], wideSummaryHeaders = [], longSummaryHeaders = []
-const  LINUX_BASE_DIR = settings['LINUX_BASE_DIR'], WINDOWS_BASE_DIR = settings['WINDOWS_BASE_DIR'], DURATION = 7
+let startDate, endDate, userEmail, emaID, dataDir, up, summaryCounter, fileCounter, moveCounter, sleepCounter,
+  timeBasedFilename, wideSummaryFile, longSummaryFile, shortSummaryFile, baseDataDir, originalStartDate
+let dataSummary = [], moveIdentifiers = [], sleepIdentifiers = [], moveTicksData = [], sleepTicksData = [],
+  wideSummaryHeaders = [], longSummaryHeaders = []
+const LINUX_BASE_DIR = settings['LINUX_BASE_DIR'], WINDOWS_BASE_DIR = settings['WINDOWS_BASE_DIR']
 const HR_HEADERS = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'xid', 'title', 'place_lon', 'place_lat', 'place_acc', 'place_name', 'time_created', 'time_updated', 'date', 'resting_heartrate', 'details.tz', 'details.sunrise', 'details.sunset']
 const WORKOUT_HEADERS = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'xid', 'title', 'sub_type', 'place_lon', 'place_lat', 'place_acc', 'place_name', 'time_created', 'time_updated', 'time_completed', 'date', 'reaction', 'route', 'image', 'details.steps', 'details.time', 'details.tz', 'details.bg_active_time', 'details.calories', 'details.bmr_calories', 'details.bmr', 'details.bg_calories', 'details.meters', 'details.km', 'details.intensity']
 const MOVE_HEADERS = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'xid', 'title', 'type', 'time_created', 'time_updated', 'time_completed', 'date', 'details.distance', 'details.km', 'details.steps', 'details.steps_3am', 'details.active_time', 'details.longest_active', 'details.inactive_time', 'details.longest_idle', 'details.calories', 'details.bmr_day', 'details.bmr', 'details.bg_calories', 'details.wo_calories', 'details.wo_time', 'details.wo_active_time', 'details.wo_count', 'details.wo_longest', 'details.sunrise', 'details.sunset', 'details.tz']
-const SLEEP_HEADERS = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'xid', 'title', 'sub_type', 'time_created', 'time_updated','time_completed', 'date', 'place_lat', 'place_lon', 'place_acc', 'place_name', 'details.smart_alarm_fire', 'details.awake_time', 'details.asleep_time', 'details.awakenings', 'details.rem', 'details.light', 'details.sound', 'details.awake', 'details.duration', 'details.tz', 'details.body', 'details.mind', 'details.quality', 'details.sunset', 'details.sunrise']
+const SLEEP_HEADERS = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'xid', 'title', 'sub_type', 'time_created', 'time_updated', 'time_completed', 'date', 'place_lat', 'place_lon', 'place_acc', 'place_name', 'details.smart_alarm_fire', 'details.awake_time', 'details.asleep_time', 'details.awakenings', 'details.rem', 'details.light', 'details.sound', 'details.awake', 'details.duration', 'details.tz', 'details.body', 'details.mind', 'details.quality', 'details.sunset', 'details.sunrise']
+const BODY_EVENTS_HEADERS = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'date', 'xid', 'title', 'type', 'time_created', 'time_updated', 'date', 'place_lat', 'place_lon', 'place_acc', 'place_name', 'note', 'lean_mass', 'weight', 'body_fat', 'bmi', 'image', 'waistline', 'details.tz']
+const TRENDS_HEADERS = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'title', 'e_protein', 'weight', 'goal_body_weight_intent', 'body_fat', 'm_distance', 's_awakenings', 'height', 'm_lcat', 'goal_body_weight', 's_quality', 'e_calories', 'e_cholesterol', 's_light', 'e_sat_fat', 'n_bedtime', 'm_workout_time', 'e_calcium', 's_bedtime', 'n_awakenings', 'n_light', 's_awake_time', 's_sound', 'pal', 'n_duration', 'm_lcit', 'm_active_time', 'e_unsat_fat', 'm_calories', 'rhr', 'bmr', 'm_total_calories', 'n_sound', 'e_sugar', 'e_sodium', 's_awake', 's_asleep_time', 's_duration', 'n_awake', 'age', 'e_carbs', 'e_fiber', 'm_steps', 'n_quality', 'n_awake_time', 'gender', 'n_asleep_time']
 const MOVE_TICKS_HEADERS = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'distance', 'time_completed', 'active_time', 'calories', 'steps', 'time', 'speed']
 const SLEEP_TICKS_HEADERS = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'depth', 'time']
 const SUMMARY_HEADERS = ['date', 'user_email', 'ema_id', 'resting_heartrate', 'step_count', 'sleep_duration']
 const SHORT_SUMMARY_HEADERS = ['USERID', 'SUBJECTID', 'JAWBONEEMAIL', 'NUMSLEEPDAYS', 'NUMSTEPDAYS', 'STARTDATE', 'REASON']
-const NUM_FILES_TO_WRITE = 10
-const WAIT_TIME = 2000
+const NUM_FILES_TO_WRITE = 12, WAIT_TIME = 2000, DURATION = 7
 
 let downloader = require('./downloader.js')
 
@@ -48,8 +51,8 @@ exports.jawboneStrategy = new JawboneStrategy(jawboneAuth, function (token, refr
   up = require('jawbone-up')(options)
   let params = {
     start_time: startDate,
-    end_time: endDate
-    , limit: 1000000
+    end_time: endDate,
+    limit: 1000000
   }
 
   summaryCounter = 0
@@ -60,6 +63,14 @@ exports.jawboneStrategy = new JawboneStrategy(jawboneAuth, function (token, refr
   up.me.get({}, function (err, body) {
     if (err) { console.log(new Date() + 'Error : ' + err) }
     setUserDetails(JSON.parse(body))
+  })
+
+  up.events.body.get({}, function (err, body) {
+    parseData(BODY_EVENTS_HEADERS, 'body_events.csv', err, body, false)
+  })
+
+  up.trends.get(trendParams(), function (err, body) {
+    parseData(TRENDS_HEADERS, 'trends.csv', err, body, false)
   })
 
   up.heartrates.get(params, function (err, body) {
@@ -100,12 +111,18 @@ exports.jawboneStrategy = new JawboneStrategy(jawboneAuth, function (token, refr
   )
 })
 
+function trendParams () {
+  let lastDay = new Date(endDate * 1000)
+  let trendEndDate = parseInt(lastDay.getFullYear() + appendZero(lastDay.getMonth() + 1) + appendZero(lastDay.getDate()))
+  return {end_date: trendEndDate, bucket_size: 'd', num_buckets: DURATION}
+}
+
 function setUserDetails (json) {
-  let userData = json.data;
-  user.setHeight(userData.height);
-  user.setWeight(userData.weight);
-  user.setGender(userData.gender ? 1 : 0); // false === 0 === male and true === 1 === female
-  user.setUserId(json.meta['user_xid']);
+  let userData = json.data
+  user.setHeight(userData.height)
+  user.setWeight(userData.weight)
+  user.setGender(userData.gender ? 1 : 0) // false === 0 === male and true === 1 === female
+  user.setUserId(json.meta['user_xid'])
 }
 
 exports.setUpParameters = function (req) {
@@ -124,7 +141,7 @@ exports.setUpParameters = function (req) {
     beginDate = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate())
   }
   startDate = beginDate.getTime() / 1000
-  originalStartDate = new Date(JSON.parse(JSON.stringify(beginDate)));
+  originalStartDate = new Date(JSON.parse(JSON.stringify(beginDate)))
 
   let lastDate = req.query['endDate']
   if (lastDate) {
@@ -155,6 +172,7 @@ exports.resetVariables = () => {
   sleepTicksData = []
   startDate = null
   originalStartDate = null
+  endDate = null
   summaryCounter = 0
   fileCounter = 0
   moveCounter = 0
@@ -225,10 +243,29 @@ function parseData (headers, file, err, body, getTicks) {
   if (err) {
     console.log(new Date() + ': Error Receiving Jawbone UP Data: ' + err)
   } else {
-    let dataItems = JSON.parse(body).data.items
-    if (dataItems) {
+    if (file === 'trends.csv') {
+      parseTrendsData(body, headers, file, getTicks)
+    } else {
+      let dataItems = JSON.parse(body).data.items
+      if (dataItems) {
+        appendExtraItems(dataItems, body, getTicks, file)
+        convertAndFlush(dataItems, headers, file, true)
+      }
+    }
+  }
+}
+
+function parseTrendsData (body, headers, file, getTicks) {
+  let results = JSON.parse(body).data.data
+  if (results) {
+    let dataItems = []
+    for (let k = 0; k < results.length; k++) {
+      let trend = {}
+      trend = results[k][1]
+      trend.title = results[k][0]
+      dataItems.push(trend)
       appendExtraItems(dataItems, body, getTicks, file)
-      convertAndFlush(dataItems, headers, file, true)
+      convertAndFlush(dataItems, headers, file, false)
     }
   }
 }
@@ -239,7 +276,9 @@ function appendExtraItems (dataItems, body, getTicks, filename) {
     dataItems[k]['time_accessed'] = JSON.parse(body).meta['time']
     dataItems[k]['user_email'] = userEmail
     dataItems[k]['ema_id'] = emaID
-    dataItems[k]['title'] = dataItems[k]['title'].replace(',', '')
+    if (dataItems[k]['title'] !== null && typeof dataItems[k]['title'] === 'string') {
+      dataItems[k]['title'] = (dataItems[k]['title']).replace(',', '')
+    }
     if (getTicks) {
       if (filename === 'moves.csv') {
         moveIdentifiers.push(dataItems[k]['xid'])
@@ -266,8 +305,8 @@ function convertAndFlush (dataArray, headers, file, summary) {
       }
     })
   } else {
-      writeToFile(dataArray, headers, dataDir + file, summary, true)
-    }
+    writeToFile(dataArray, headers, dataDir + file, summary, true)
+  }
 }
 
 function writeToFile (dataArray, headers, file, summary, prependHeader) {
@@ -365,8 +404,8 @@ function createSummaryObjects (jsonArray) {
     if (dailyDataJsonArray.length === 0) {
       dailyDataJsonObject = {}
       dailyDataJsonObject['date'] = entry.date
-      dailyDataJsonObject.user_email = user.email;
-      dailyDataJsonObject.ema_id = user.studyId;
+      dailyDataJsonObject.user_email = user.email
+      dailyDataJsonObject.ema_id = user.studyId
       dailyDataJsonObject['resting_heartrate'] = ''
       dailyDataJsonObject['step_count'] = ''
       dailyDataJsonObject['sleep_duration'] = ''
@@ -417,6 +456,16 @@ function compare (objA, objB) {
   }
 }
 
+function appendZero (str) {
+  if (typeof str === 'number') {
+    str = str.toString()
+  }
+  if (str.length === 1) {
+    str = '0' + str
+  }
+  return str
+}
+
 function sanitizeCombinedSummaryData (summaryArray) {
   let date
   if (summaryArray.length < DURATION) {
@@ -424,12 +473,8 @@ function sanitizeCombinedSummaryData (summaryArray) {
       let newStartDate = new Date(JSON.parse(JSON.stringify(originalStartDate)))
       let dataDate = new Date(newStartDate.setTime(newStartDate.getTime() + i * 86400000)).toLocaleDateString().split('/')
       let month = dataDate[0], day = dataDate[1]
-      if (month.length === 1) {
-        month = '0' + month
-      }
-      if (day.length === 1) {
-        day = '0' + day
-      }
+      month = appendZero(month)
+      day = appendZero(day)
       date = parseInt(dataDate[2] + month + day)
       let dailyDataJsonArray = summaryArray.filter(function (value) {
         return value.date === date
@@ -462,7 +507,7 @@ function writeWideFormat (data) {
     dataRow['step_count_day_' + j] = data[j]['step_count']
   }
   userData.push(dataRow)
-  writeToFile (userData, wideSummaryHeaders, wideSummaryFile, false, false)
+  writeToFile(userData, wideSummaryHeaders, wideSummaryFile, false, false)
 }
 
 function writeLongFormat (data) {
@@ -475,7 +520,7 @@ function writeLongFormat (data) {
     dataRow['step_count'] = data[j]['step_count']
     userData.push(dataRow)
   }
-  writeToFile (userData, longSummaryHeaders, longSummaryFile, false, false)
+  writeToFile(userData, longSummaryHeaders, longSummaryFile, false, false)
 }
 
 function writeShortFormat (data) {
@@ -487,10 +532,16 @@ function writeShortFormat (data) {
     return (value.step_count !== null && value.step_count !== '')
   })
   let dataRow = {
-    'USERID': user.userId, 'SUBJECTID': user.studyId, 'JAWBONEEMAIL': user.email, 'NUMSLEEPDAYS': sleepDays.length, 'NUMSTEPDAYS': stepDays.length, 'STARTDATE': originalStartDate.toLocaleDateString(), 'REASON': user.reason
+    'USERID': user.userId,
+    'SUBJECTID': user.studyId,
+    'JAWBONEEMAIL': user.email,
+    'NUMSLEEPDAYS': sleepDays.length,
+    'NUMSTEPDAYS': stepDays.length,
+    'STARTDATE': originalStartDate.toLocaleDateString(),
+    'REASON': user.reason
   }
   userData.push(dataRow)
-  writeToFile (userData, SHORT_SUMMARY_HEADERS, shortSummaryFile, false, false)
+  writeToFile(userData, SHORT_SUMMARY_HEADERS, shortSummaryFile, false, false)
 }
 
 function formatDateString (str) {
