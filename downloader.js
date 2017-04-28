@@ -6,6 +6,7 @@ let downloadDone
 let userCount = 0
 const WAIT_TIME = 120000
 let strategy = require('./strategy.js')
+let summarize = require('./summarize.js')
 
 let browser = new webDriver.Builder().usingServer().withCapabilities({'browserName': 'chrome'}).build()
 
@@ -14,7 +15,7 @@ exports.getBrowser = () => {
 }
 
 exports.startDownload = function () {
-  lineReader.eachLine('config/test.csv', function (line, last) {
+  lineReader.eachLine('config/sc.csv', function (line, last) {
     userDetails.push(line)
     if (last) {
       downloadUserData(userDetails[0])
@@ -33,6 +34,7 @@ function downloadUserData (userString) {
   console.log('start user download for user # ' + userCount + ' with ID ' + userInfo[0])
   browser.get('https://localhost:5000/')
   // First page
+  browser.navigate().refresh()
   let idElement = browser.wait(webDriver.until.elementLocated(webDriver.By.id('emaId')), WAIT_TIME)
   idElement.clear()
   idElement.sendKeys(userInfo[0])
@@ -45,9 +47,11 @@ function downloadUserData (userString) {
   let submitElement = browser.wait(webDriver.until.elementLocated(webDriver.By.id('submit')), WAIT_TIME)
   submitElement.click()
   // Second page
+  browser.navigate().refresh()
   let loginElement = browser.wait(webDriver.until.elementLocated(webDriver.By.id('login')), WAIT_TIME)
   loginElement.click()
   // Third page
+  browser.navigate().refresh()
   let jawboneEmailElement = browser.wait(webDriver.until.elementLocated(webDriver.By.id('jawbone-signin-email')), WAIT_TIME)
   jawboneEmailElement.sendKeys(userInfo[1])
   let jawbonePasswordElement = browser.wait(webDriver.until.elementLocated(webDriver.By.id('jawbone-signin-password')), WAIT_TIME)
@@ -55,6 +59,7 @@ function downloadUserData (userString) {
   let signInElement = browser.wait(webDriver.until.elementLocated(webDriver.By.xpath('//button[@type=\'submit\'][@class=\'form-button\']')), WAIT_TIME)
   signInElement.click()
   // Fourth page
+  browser.navigate().refresh()
   let agreeElement = browser.wait(webDriver.until.elementLocated(webDriver.By.xpath('//button[@type=\'submit\'][@class=\'form-button\']')), WAIT_TIME)
   agreeElement.click()
   // Last page
@@ -72,6 +77,9 @@ function clickOnLogoutButton () {
       if (userCount < userDetails.length) {
         downloadUserData(userDetails[userCount])
       } else {
+        setTimeout(function () {
+          summarize.summarize(strategy.getBaseDataDir())
+        }, 30000)
         downloadDone = true
       }
     } else {

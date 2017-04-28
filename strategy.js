@@ -15,7 +15,7 @@ let jawboneAuth = {
 let startDate, endDate, userEmail, emaID, dataDir, up, summaryCounter, fileCounter, moveCounter, sleepCounter,
   timeBasedFilename, wideSummaryFile, longSummaryFile, shortSummaryFile, baseDataDir, originalStartDate
 let dataSummary = [], moveIdentifiers = [], sleepIdentifiers = [], moveTicksData = [], sleepTicksData = [],
-  wideSummaryHeaders = [], longSummaryHeaders = []
+  wideSummaryHeaders = [], longSummaryHeaders = [], combinedSummaryHeaders = [], combinedSummaryData = []
 const LINUX_BASE_DIR = settings['LINUX_BASE_DIR'], WINDOWS_BASE_DIR = settings['WINDOWS_BASE_DIR']
 const HR_HEADERS = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'xid', 'title', 'place_lon', 'place_lat', 'place_acc', 'place_name', 'time_created', 'time_updated', 'date', 'resting_heartrate', 'details.tz', 'details.sunrise', 'details.sunset']
 const WORKOUT_HEADERS = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'xid', 'title', 'sub_type', 'place_lon', 'place_lat', 'place_acc', 'place_name', 'time_created', 'time_updated', 'time_completed', 'date', 'reaction', 'route', 'image', 'details.steps', 'details.time', 'details.tz', 'details.bg_active_time', 'details.calories', 'details.bmr_calories', 'details.bmr', 'details.bg_calories', 'details.meters', 'details.km', 'details.intensity']
@@ -27,7 +27,7 @@ const MOVE_TICKS_HEADERS = ['user_xid', 'user_email', 'ema_id', 'time_accessed',
 const SLEEP_TICKS_HEADERS = ['user_xid', 'user_email', 'ema_id', 'time_accessed', 'depth', 'time']
 const SUMMARY_HEADERS = ['date', 'user_email', 'ema_id', 'resting_heartrate', 'step_count', 'sleep_duration']
 const SHORT_SUMMARY_HEADERS = ['USERID', 'SUBJECTID', 'JAWBONEEMAIL', 'NUMSLEEPDAYS', 'NUMSTEPDAYS', 'STARTDATE', 'REASON']
-const NUM_FILES_TO_WRITE = 12, WAIT_TIME = 2000, DURATION = 7
+const NUM_FILES_TO_WRITE = 12, WAIT_TIME = 2000, DURATION = 85
 
 let downloader = require('./downloader.js')
 
@@ -42,6 +42,10 @@ exports.setUser = (u) => {
   user = u
 }
 
+exports.getBaseDataDir = () => {
+  return baseDataDir
+}
+
 exports.jawboneStrategy = new JawboneStrategy(jawboneAuth, function (token, refreshToken, profile, done) {
   let options = {
     access_token: token,
@@ -50,8 +54,8 @@ exports.jawboneStrategy = new JawboneStrategy(jawboneAuth, function (token, refr
   }
   up = require('jawbone-up')(options)
   let params = {
-    start_time: startDate,
-    end_time: endDate,
+    // start_time: startDate,
+    // end_time: endDate,
     limit: 1000000
   }
 
@@ -112,9 +116,9 @@ exports.jawboneStrategy = new JawboneStrategy(jawboneAuth, function (token, refr
 })
 
 function trendParams () {
-  let lastDay = new Date(endDate * 1000)
+  let lastDay = new Date()
   let trendEndDate = parseInt(lastDay.getFullYear() + appendZero(lastDay.getMonth() + 1) + appendZero(lastDay.getDate()))
-  return {end_date: trendEndDate, bucket_size: 'd', num_buckets: DURATION}
+  return {end_date: trendEndDate, bucket_size: 'd', num_buckets: 100}
 }
 
 function setUserDetails (json) {
@@ -133,33 +137,39 @@ exports.setUpParameters = function (req) {
   userEmail = req.query['email']
   setUpDataDirectory()
 
-  let today = new Date()
+  // let today = new Date()
+  // let beginDate = req.query['startDate']
+  // if (beginDate) {
+  //   beginDate = new Date(beginDate)
+  // } else {
+  //   beginDate = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate())
+  // }
+  // startDate = beginDate.getTime() / 1000
+  // originalStartDate = new Date(JSON.parse(JSON.stringify(beginDate)))
+  //
+  // let lastDate = req.query['endDate']
+  // if (lastDate) {
+  //   endDate = new Date(lastDate).getTime() / 1000
+  // } else {
+  //   endDate = new Date(beginDate.setTime(beginDate.getTime() + DURATION * 86400000)).getTime() / 1000
+  // }
+
   let beginDate = req.query['startDate']
   if (beginDate) {
     beginDate = new Date(beginDate)
-  } else {
-    beginDate = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate())
   }
-  startDate = beginDate.getTime() / 1000
   originalStartDate = new Date(JSON.parse(JSON.stringify(beginDate)))
-
-  let lastDate = req.query['endDate']
-  if (lastDate) {
-    endDate = new Date(lastDate).getTime() / 1000
-  } else {
-    endDate = new Date(beginDate.setTime(beginDate.getTime() + DURATION * 86400000)).getTime() / 1000
-  }
 }
 
 exports.generateCombinedSummaryFiles = function () {
   if (downloader.getUserCount() === 0) {
     setBaseDataDirectory()
     createDirectory(baseDataDir + 'summaries/')
-    let base = baseDataDir + 'summaries/' + timeBasedFilename
-    wideSummaryFile = base + 'wide.csv'
-    longSummaryFile = base + 'long.csv'
-    shortSummaryFile = base + 'short.csv'
-    generateCombinedSummaryHeaders()
+    // let base = baseDataDir + 'summaries/' + timeBasedFilename
+    // wideSummaryFile = base + 'wide.csv'
+    // longSummaryFile = base + 'long.csv'
+    // shortSummaryFile = base + 'short.csv'
+    // generateCombinedSummaryHeaders()
   }
 }
 
@@ -226,7 +236,7 @@ function setBaseDataDirectory () {
     baseDataDir = 'data/'
   }
   if (timeBasedFilename === null || timeBasedFilename === undefined) {
-    timeBasedFilename = new Date().toString().replace(/\W/g, '_')
+    timeBasedFilename = new Date().getTime().toString()
   }
   dataDir = baseDataDir + user.studyId + '/' + timeBasedFilename + '/'
 }
@@ -296,7 +306,7 @@ function appendExtraItems (dataItems, body, getTicks, filename) {
 }
 
 function convertAndFlush (dataArray, headers, file, summary) {
-  if (file === 'summary.csv') {
+  if (file.includes('summary.csv')) {
     fs.writeFile(dataDir + file, headers, function (err) {
       if (err) {
         console.log(new Date() + ': Error writing data to ' + file + ' ' + err)
@@ -467,21 +477,24 @@ function appendZero (str) {
 }
 
 function sanitizeCombinedSummaryData (summaryArray) {
-  let date
-  if (summaryArray.length < DURATION) {
-    for (let i = 0; i < DURATION; i++) {
-      let newStartDate = new Date(JSON.parse(JSON.stringify(originalStartDate)))
-      let dataDate = new Date(newStartDate.setTime(newStartDate.getTime() + i * 86400000)).toLocaleDateString().split('/')
-      let month = dataDate[0], day = dataDate[1]
+  if (summaryArray.length > 1) {
+    summaryArray.sort(compare)
+    let firstDay = summaryArray[0].date
+    let lastDay = summaryArray[summaryArray.length - 1].date
+    let start = new Date(firstDay.toString().substring(0,4), parseInt(firstDay.toString().substring(4,6)) - 1, firstDay.toString().substring(6))
+    let checker = true
+    while (checker) {
+      let nextDay = new Date(start.setTime(start.getTime() + 86400000)).toLocaleDateString().split('/')
+      let month = nextDay[0], day = nextDay[1]
       month = appendZero(month)
       day = appendZero(day)
-      date = parseInt(dataDate[2] + month + day)
+      let nextDate = parseInt(nextDay[2] + month + day)
       let dailyDataJsonArray = summaryArray.filter(function (value) {
-        return value.date === date
+        return value.date === nextDate
       })
       if (dailyDataJsonArray.length === 0) {
         let jsonObject = {}
-        jsonObject.date = date
+        jsonObject.date = nextDate
         jsonObject.user_email = user.email
         jsonObject.ema_id = user.studyId
         jsonObject.resting_heartrate = ''
@@ -489,12 +502,20 @@ function sanitizeCombinedSummaryData (summaryArray) {
         jsonObject.sleep_duration = ''
         summaryArray.push(jsonObject)
       }
+      if (lastDay === nextDate) {
+        checker = false
+      }
     }
     summaryArray.sort(compare)
+    writeWideFormat(summaryArray)
+    writeLongFormat(summaryArray)
+    writeShortFormat(summaryArray)
+  } else {
+    writeWideFormat(summaryArray)
+    writeLongFormat(summaryArray)
+    writeShortFormat(summaryArray)
   }
-  writeWideFormat(summaryArray)
-  writeLongFormat(summaryArray)
-  writeShortFormat(summaryArray)
+
 }
 
 function writeWideFormat (data) {
@@ -507,7 +528,7 @@ function writeWideFormat (data) {
     dataRow['step_count_day_' + j] = data[j]['step_count']
   }
   userData.push(dataRow)
-  writeToFile(userData, wideSummaryHeaders, wideSummaryFile, false, false)
+  convertAndFlush(userData, Object.keys(dataRow), 'wide_summary.csv', false)
 }
 
 function writeLongFormat (data) {
@@ -520,7 +541,11 @@ function writeLongFormat (data) {
     dataRow['step_count'] = data[j]['step_count']
     userData.push(dataRow)
   }
-  writeToFile(userData, longSummaryHeaders, longSummaryFile, false, false)
+  let headers = []
+  if (userData[0]) {
+    headers = Object.keys(userData[0])
+  }
+  convertAndFlush(userData, headers, 'long_summary.csv', false)
 }
 
 function writeShortFormat (data) {
@@ -532,16 +557,14 @@ function writeShortFormat (data) {
     return (value.step_count !== null && value.step_count !== '')
   })
   let dataRow = {
-    'USERID': user.userId,
-    'SUBJECTID': user.studyId,
-    'JAWBONEEMAIL': user.email,
-    'NUMSLEEPDAYS': sleepDays.length,
-    'NUMSTEPDAYS': stepDays.length,
-    'STARTDATE': originalStartDate.toLocaleDateString(),
-    'REASON': user.reason
+    'user_id': user.userId,
+    'subject_id': user.studyId,
+    'jawbone_email': user.email,
+    'num_sleep_days': sleepDays.length,
+    'num_step_days': stepDays.length
   }
   userData.push(dataRow)
-  writeToFile(userData, SHORT_SUMMARY_HEADERS, shortSummaryFile, false, false)
+  convertAndFlush(userData, Object.keys(dataRow), 'short_summary.csv', false)
 }
 
 function formatDateString (str) {
@@ -556,6 +579,5 @@ function generateDefaultRowData () {
   dataRow['height'] = user.height
   dataRow['gender_label'] = user.gender ? 'female' : 'male'
   dataRow['weight'] = user.weight
-  dataRow['study_start_date'] = originalStartDate.toLocaleDateString()
   return dataRow
 }
